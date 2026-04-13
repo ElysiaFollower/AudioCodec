@@ -13,3 +13,5 @@ venv/
 /data/
 /outputs/
 /runs/
+
+*.egg-info/
