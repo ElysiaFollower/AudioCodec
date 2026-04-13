@@ -1,0 +1,42 @@
+name: Course Project Task
+description: 记录课程项目中的结构化任务
+title: "[Task] "
+labels:
+  - task
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目标
+      description: 这项任务完成后，具体要交付什么？
+      placeholder: 例如：完成 speech codec baseline 的 RVQ 模块并跑通训练
+    validations:
+      required: true
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景
+      description: 为什么要做这件事？它和当前里程碑的关系是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: 约束
+      description: 时间、硬件、依赖、数据、风险等限制条件
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 用可观察的结果描述“完成”
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: 明确这次不做什么，避免 scope 漂移
+    validations:
+      required: true
