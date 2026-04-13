@@ -29,7 +29,13 @@
   "loss": {
     "waveform_weight": 1.0,
     "stft_weight": 1.0,
-    "fft_sizes": [512, 1024, 2048]
+    "fft_sizes": [512, 1024, 2048],
+    "mel_weight": 0.0,
+    "mel_n_mels": 80,
+    "mel_fft_size": 1024,
+    "mel_hop_length": 256,
+    "mel_f_min": 0.0,
+    "mel_f_max": null
   },
   "optimization": {
     "learning_rate": 0.0002,

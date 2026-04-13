@@ -78,9 +78,23 @@ class LossConfig:
     waveform_weight: float = 1.0
     stft_weight: float = 1.0
     fft_sizes: tuple[int, ...] = (512, 1_024, 2_048)
+    mel_weight: float = 0.0
+    mel_n_mels: int = 80
+    mel_fft_size: int = 1_024
+    mel_hop_length: int = 256
+    mel_f_min: float = 0.0
+    mel_f_max: float | None = None
 
     def __post_init__(self) -> None:
         self.fft_sizes = tuple(self.fft_sizes)
+        if self.mel_weight < 0:
+            raise ValueError("mel_weight must be non-negative.")
+        if self.mel_n_mels <= 0:
+            raise ValueError("mel_n_mels must be positive.")
+        if self.mel_fft_size <= 0:
+            raise ValueError("mel_fft_size must be positive.")
+        if self.mel_hop_length <= 0:
+            raise ValueError("mel_hop_length must be positive.")
 
 
 @dataclass(slots=True)

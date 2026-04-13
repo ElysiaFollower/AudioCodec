@@ -108,11 +108,18 @@ def build_dataloaders(
 
 def build_loss(config: CodecExperimentConfig) -> CodecLoss:
     return CodecLoss(
+        sample_rate=config.audio.sample_rate,
         waveform_weight=config.loss.waveform_weight,
         stft_weight=config.loss.stft_weight,
+        mel_weight=config.loss.mel_weight,
         commitment_weight=config.quantizer.commitment_weight,
         codebook_weight=config.quantizer.codebook_weight,
         fft_sizes=config.loss.fft_sizes,
+        mel_n_mels=config.loss.mel_n_mels,
+        mel_fft_size=config.loss.mel_fft_size,
+        mel_hop_length=config.loss.mel_hop_length,
+        mel_f_min=config.loss.mel_f_min,
+        mel_f_max=config.loss.mel_f_max,
     )
 
 
