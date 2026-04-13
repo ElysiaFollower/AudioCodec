@@ -8,9 +8,8 @@ __pycache__/
 .venv/
 venv/
 
-artifacts/
-checkpoints/
-data/
-outputs/
-runs/
-
+/artifacts/
+/checkpoints/
+/data/
+/outputs/
+/runs/
