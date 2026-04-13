@@ -30,6 +30,7 @@ class TrainingArtifacts:
     output_dir: Path
     resolved_config_path: Path
     metrics_path: Path
+    tensorboard_dir: Path | None = None
 
 
 def set_seed(seed: int) -> None:
@@ -129,6 +130,23 @@ def append_metrics(metrics_path: Path, payload: dict) -> None:
         handle.write(json.dumps(payload) + "\n")
 
 
+def create_tensorboard_writer(output_dir: Path, enabled: bool):
+    if not enabled:
+        return None
+
+    try:
+        from torch.utils.tensorboard import SummaryWriter
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "TensorBoard logging was requested, but the active environment does not provide it. "
+            "Install `tensorboard` or run without `--tensorboard`."
+        ) from exc
+
+    log_dir = output_dir / "tensorboard"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return SummaryWriter(log_dir=str(log_dir))
+
+
 def save_checkpoint(
     path: Path,
     model: nn.Module,
@@ -210,6 +228,7 @@ def train_codec(
     smoke_test: bool = False,
     limit_train_examples: int | None = None,
     device: str | None = None,
+    tensorboard: bool = False,
 ) -> TrainingArtifacts:
     output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
@@ -229,107 +248,122 @@ def train_codec(
     amp_enabled = config.optimization.mixed_precision and resolved_device.type == "cuda"
     scaler = torch.cuda.amp.GradScaler(enabled=amp_enabled)
     train_iterator = cycle_dataloader(train_loader)
+    writer = create_tensorboard_writer(output_path, enabled=tensorboard)
 
     resolved_config_path = output_path / "resolved_config.json"
     metrics_path = output_path / "metrics.jsonl"
     resolved_config_path.write_text(json.dumps(config.to_dict(), indent=2))
+    if writer is not None:
+        writer.add_text("config/json", json.dumps(config.to_dict(), indent=2))
 
     total_steps = steps
     if total_steps is None:
         total_steps = config.optimization.smoke_test_steps if smoke_test else config.optimization.main_steps
 
     best_val_loss = float("inf")
-    for step in range(1, total_steps + 1):
-        started_at = time.perf_counter()
-        model.train()
-        batch = next(train_iterator).to(resolved_device)
+    try:
+        for step in range(1, total_steps + 1):
+            started_at = time.perf_counter()
+            model.train()
+            batch = next(train_iterator).to(resolved_device)
 
-        optimizer.zero_grad(set_to_none=True)
-        autocast_context = (
-            torch.autocast(device_type="cuda", dtype=torch.float16)
-            if amp_enabled
-            else nullcontext()
-        )
-        with autocast_context:
-            output = model(batch)
-            losses = criterion(
-                reconstruction=output.reconstruction,
-                target=batch,
-                commitment_loss=output.commitment_loss,
-                codebook_loss=output.codebook_loss,
+            optimizer.zero_grad(set_to_none=True)
+            autocast_context = (
+                torch.autocast(device_type="cuda", dtype=torch.float16)
+                if amp_enabled
+                else nullcontext()
             )
-            total_loss = losses["total_loss"]
+            with autocast_context:
+                output = model(batch)
+                losses = criterion(
+                    reconstruction=output.reconstruction,
+                    target=batch,
+                    commitment_loss=output.commitment_loss,
+                    codebook_loss=output.codebook_loss,
+                )
+                total_loss = losses["total_loss"]
 
-        if amp_enabled:
-            scaler.scale(total_loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            total_loss.backward()
-            optimizer.step()
+            if amp_enabled:
+                scaler.scale(total_loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                total_loss.backward()
+                optimizer.step()
 
-        step_metrics = {name: float(value.item()) for name, value in losses.items()}
-        step_metrics["step_time_seconds"] = time.perf_counter() - started_at
+            step_metrics = {name: float(value.item()) for name, value in losses.items()}
+            step_metrics["step_time_seconds"] = time.perf_counter() - started_at
 
-        if step == 1 or step % config.optimization.log_interval == 0:
-            append_metrics(metrics_path, {"split": "train", "step": step, **step_metrics})
-            print(
-                f"[train] step={step} total={step_metrics['total_loss']:.4f} "
-                f"waveform={step_metrics['waveform_loss']:.4f} stft={step_metrics['stft_loss']:.4f}"
-            )
-
-        should_evaluate = (
-            step == total_steps
-            or step % config.optimization.eval_interval == 0
-            or step % config.optimization.checkpoint_interval == 0
-        )
-        if should_evaluate:
-            val_metrics, preview = evaluate(
-                model=model,
-                criterion=criterion,
-                dataloader=val_loader,
-                device=resolved_device,
-                max_batches=config.optimization.max_eval_batches,
-            )
-            append_metrics(metrics_path, {"split": "val", "step": step, **val_metrics})
-            print(
-                f"[val] step={step} total={val_metrics['total_loss']:.4f} "
-                f"waveform={val_metrics['waveform_loss']:.4f} stft={val_metrics['stft_loss']:.4f}"
-            )
-
-            if preview is not None:
-                save_reconstruction_examples(
-                    sample_dir=output_path / "samples",
-                    step=step,
-                    source=preview[0],
-                    reconstruction=preview[1],
-                    sample_rate=config.audio.sample_rate,
+            if step == 1 or step % config.optimization.log_interval == 0:
+                append_metrics(metrics_path, {"split": "train", "step": step, **step_metrics})
+                if writer is not None:
+                    for name, value in step_metrics.items():
+                        writer.add_scalar(f"train/{name}", value, global_step=step)
+                print(
+                    f"[train] step={step} total={step_metrics['total_loss']:.4f} "
+                    f"waveform={step_metrics['waveform_loss']:.4f} stft={step_metrics['stft_loss']:.4f}"
                 )
 
-            checkpoint_path = output_path / "checkpoints" / f"step-{step:06d}.pt"
-            save_checkpoint(
-                checkpoint_path,
-                model=model,
-                optimizer=optimizer,
-                step=step,
-                config=config,
-                metrics=val_metrics,
+            should_evaluate = (
+                step == total_steps
+                or step % config.optimization.eval_interval == 0
+                or step % config.optimization.checkpoint_interval == 0
             )
+            if should_evaluate:
+                val_metrics, preview = evaluate(
+                    model=model,
+                    criterion=criterion,
+                    dataloader=val_loader,
+                    device=resolved_device,
+                    max_batches=config.optimization.max_eval_batches,
+                )
+                append_metrics(metrics_path, {"split": "val", "step": step, **val_metrics})
+                if writer is not None:
+                    for name, value in val_metrics.items():
+                        writer.add_scalar(f"val/{name}", value, global_step=step)
+                print(
+                    f"[val] step={step} total={val_metrics['total_loss']:.4f} "
+                    f"waveform={val_metrics['waveform_loss']:.4f} stft={val_metrics['stft_loss']:.4f}"
+                )
 
-            if val_metrics["total_loss"] < best_val_loss:
-                best_val_loss = val_metrics["total_loss"]
+                if preview is not None:
+                    save_reconstruction_examples(
+                        sample_dir=output_path / "samples",
+                        step=step,
+                        source=preview[0],
+                        reconstruction=preview[1],
+                        sample_rate=config.audio.sample_rate,
+                    )
+
+                checkpoint_path = output_path / "checkpoints" / f"step-{step:06d}.pt"
                 save_checkpoint(
-                    output_path / "checkpoints" / "best.pt",
+                    checkpoint_path,
                     model=model,
                     optimizer=optimizer,
                     step=step,
                     config=config,
                     metrics=val_metrics,
                 )
-            model.train()
 
+                if val_metrics["total_loss"] < best_val_loss:
+                    best_val_loss = val_metrics["total_loss"]
+                    save_checkpoint(
+                        output_path / "checkpoints" / "best.pt",
+                        model=model,
+                        optimizer=optimizer,
+                        step=step,
+                        config=config,
+                        metrics=val_metrics,
+                    )
+                model.train()
+    finally:
+        if writer is not None:
+            writer.close()
+
+    tensorboard_dir = output_path / "tensorboard" if tensorboard else None
     return TrainingArtifacts(
         output_dir=output_path,
         resolved_config_path=resolved_config_path,
         metrics_path=metrics_path,
+        tensorboard_dir=tensorboard_dir,
     )

@@ -1,0 +1,54 @@
+{
+  "dataset": {
+    "root": "/path/to/LibriSpeech/dev-clean",
+    "train_minutes": 60,
+    "val_minutes": 10,
+    "test_minutes": 10
+  },
+  "audio": {
+    "sample_rate": 16000,
+    "channels": 1,
+    "train_clip_seconds": 2.0,
+    "eval_clip_seconds": 2.0
+  },
+  "model": {
+    "base_channels": 32,
+    "channel_multipliers": [1, 2, 4, 4],
+    "encoder_strides": [5, 4, 4, 2],
+    "latent_dim": 128,
+    "residual_layers_per_stage": 2,
+    "input_kernel_size": 7,
+    "output_kernel_size": 7
+  },
+  "quantizer": {
+    "codebook_size": 256,
+    "num_quantizers": 8,
+    "commitment_weight": 0.25,
+    "codebook_weight": 1.0
+  },
+  "loss": {
+    "waveform_weight": 1.0,
+    "stft_weight": 1.0,
+    "fft_sizes": [512, 1024, 2048],
+    "mel_weight": 0.5,
+    "mel_n_mels": 80,
+    "mel_fft_size": 1024,
+    "mel_hop_length": 256,
+    "mel_f_min": 0.0,
+    "mel_f_max": null
+  },
+  "optimization": {
+    "learning_rate": 0.0002,
+    "weight_decay": 0.0001,
+    "batch_size": 16,
+    "smoke_test_steps": 500,
+    "main_steps": 5000,
+    "mixed_precision": true,
+    "eval_interval": 500,
+    "checkpoint_interval": 500,
+    "log_interval": 50,
+    "num_workers": 0,
+    "max_eval_batches": 8,
+    "seed": 1337
+  }
+}

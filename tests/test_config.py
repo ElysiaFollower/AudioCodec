@@ -12,7 +12,11 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.dataset.root, "/path/to/LibriSpeech/dev-clean")
         self.assertEqual(config.frame_rate, 100)
 
+    def test_mel_ablation_config_enables_mel_loss(self) -> None:
+        config = load_experiment_config(Path("configs/ablation-mel-loss.json"))
+        self.assertEqual(config.loss.mel_weight, 0.5)
+        self.assertEqual(config.loss.mel_n_mels, 80)
+
 
 if __name__ == "__main__":
     unittest.main()
-

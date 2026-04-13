@@ -22,6 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--smoke-test", action="store_true")
     parser.add_argument("--limit-train-examples", type=int, default=None)
     parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--tensorboard", action="store_true")
     return parser.parse_args()
 
 
@@ -47,6 +48,7 @@ def main() -> None:
         smoke_test=args.smoke_test,
         limit_train_examples=args.limit_train_examples,
         device=args.device,
+        tensorboard=args.tensorboard,
     )
 
 
