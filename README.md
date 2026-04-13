@@ -16,4 +16,35 @@ Last reviewed: 2026-04-13
 - [当前执行计划](./plans/active/TASK-001-course-project-bootstrap.md)
 - [范围决策 ADR](./docs/adr/0001-course-project-scope.md)
 
-当前仓库以文档先行，后续代码、训练脚本和评测脚本应围绕以上文档继续补齐。
+## 环境安装
+
+推荐直接使用仓库根目录下的 [environment.yaml](/Users/ely/workspace/research/audio/AudioCodec/environment.yaml)。
+
+安装命令：
+
+```bash
+conda env create -f environment.yaml
+conda activate audiocodec
+```
+
+如果环境已经存在，更新命令：
+
+```bash
+conda env update -f environment.yaml --prune
+conda activate audiocodec
+```
+
+## 安装验证
+
+```bash
+python scripts/train_codec.py --help
+PYTHONPATH=src python -m unittest discover -s tests -v
+```
+
+## 数据路径
+
+数据集根路径默认放在 [configs/baseline.json](/Users/ely/workspace/research/audio/AudioCodec/configs/baseline.json) 的 `dataset.root` 字段里，也可以在运行时覆盖：
+
+```bash
+python scripts/train_codec.py --dataset-root /path/to/LibriSpeech/dev-clean --smoke-test
+```

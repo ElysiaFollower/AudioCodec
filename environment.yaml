@@ -1,0 +1,15 @@
+name: audiocodec
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip>=24
+  - ffmpeg
+  - matplotlib
+  - numpy
+  - setuptools>=68
+  - wheel
+  - pip:
+      - torch>=2.2,<3
+      - torchaudio>=2.2,<3
+      - -e .
