@@ -14,7 +14,11 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from audiocodec.config import CodecExperimentConfig
-from audiocodec.data.librispeech import SpeechSegmentDataset, build_librispeech_splits
+from audiocodec.data.librispeech import (
+    SpeechSegmentDataset,
+    build_librispeech_splits,
+    build_single_file_overfit_splits,
+)
 from audiocodec.losses import CodecLoss
 from audiocodec.models.codec import BaseCodecModel, build_codec_model
 
@@ -59,16 +63,21 @@ def cycle_dataloader(dataloader: DataLoader):
 def build_dataloaders(
     config: CodecExperimentConfig,
     limit_train_examples: int | None = None,
+    overfit_example_path: str | None = None,
 ) -> tuple[DataLoader, DataLoader]:
-    splits = build_librispeech_splits(
-        root=config.dataset.root,
-        train_minutes=config.dataset.train_minutes,
-        val_minutes=config.dataset.val_minutes,
-        test_minutes=config.dataset.test_minutes,
-    )
+    overfit_mode = overfit_example_path is not None
+    if overfit_mode:
+        splits = build_single_file_overfit_splits(overfit_example_path)
+    else:
+        splits = build_librispeech_splits(
+            root=config.dataset.root,
+            train_minutes=config.dataset.train_minutes,
+            val_minutes=config.dataset.val_minutes,
+            test_minutes=config.dataset.test_minutes,
+        )
 
     train_examples = splits.train
-    if limit_train_examples is not None:
+    if limit_train_examples is not None and not overfit_mode:
         train_examples = train_examples[:limit_train_examples]
         if not train_examples:
             raise ValueError("limit_train_examples truncated the training split to zero examples.")
@@ -77,30 +86,32 @@ def build_dataloaders(
         examples=train_examples,
         sample_rate=config.audio.sample_rate,
         channels=config.audio.channels,
-        clip_seconds=config.audio.train_clip_seconds,
-        random_crop=True,
+        clip_seconds=None if overfit_mode else config.audio.train_clip_seconds,
+        random_crop=not overfit_mode,
     )
     val_dataset = SpeechSegmentDataset(
-        examples=splits.val,
+        examples=train_examples if overfit_mode else splits.val,
         sample_rate=config.audio.sample_rate,
         channels=config.audio.channels,
-        clip_seconds=config.audio.eval_clip_seconds,
+        clip_seconds=None if overfit_mode else config.audio.eval_clip_seconds,
         random_crop=False,
     )
 
+    batch_size = 1 if overfit_mode else config.optimization.batch_size
+    num_workers = 0 if overfit_mode else config.optimization.num_workers
     train_loader = DataLoader(
         train_dataset,
-        batch_size=config.optimization.batch_size,
-        shuffle=True,
-        num_workers=config.optimization.num_workers,
+        batch_size=batch_size,
+        shuffle=not overfit_mode,
+        num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         drop_last=False,
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=config.optimization.batch_size,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=config.optimization.num_workers,
+        num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         drop_last=False,
     )
@@ -227,6 +238,7 @@ def train_codec(
     steps: int | None = None,
     smoke_test: bool = False,
     limit_train_examples: int | None = None,
+    overfit_example_path: str | None = None,
     device: str | None = None,
     tensorboard: bool = False,
 ) -> TrainingArtifacts:
@@ -235,7 +247,11 @@ def train_codec(
 
     set_seed(config.optimization.seed)
     resolved_device = resolve_device(device)
-    train_loader, val_loader = build_dataloaders(config, limit_train_examples=limit_train_examples)
+    train_loader, val_loader = build_dataloaders(
+        config,
+        limit_train_examples=limit_train_examples,
+        overfit_example_path=overfit_example_path,
+    )
 
     model = build_codec_model(config).to(resolved_device)
     criterion = build_loss(config).to(resolved_device)

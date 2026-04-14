@@ -8,7 +8,7 @@ import random
 import torch
 from torch.utils.data import Dataset
 
-from .splits import AudioExample, DatasetSplits, build_duration_capped_splits
+from .splits import AudioExample, DatasetSplits, build_duration_capped_splits, build_overfit_splits
 
 
 def _load_torchaudio():
@@ -65,6 +65,14 @@ def build_librispeech_splits(
         val_minutes=val_minutes,
         test_minutes=test_minutes,
     )
+
+
+def build_single_file_overfit_splits(audio_path: str | Path) -> DatasetSplits:
+    path = Path(audio_path).expanduser().resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"Overfit audio path does not exist: {path}")
+    example = AudioExample(path=path, duration_seconds=_get_audio_duration_seconds(path))
+    return build_overfit_splits(example)
 
 
 class SpeechSegmentDataset(Dataset):
