@@ -14,7 +14,7 @@ from audiocodec.config import load_experiment_config
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train the Conv + RVQ speech codec baseline.")
+    parser = argparse.ArgumentParser(description="Train an AudioCodec speech codec experiment.")
     parser.add_argument("--config", type=Path, default=Path("configs/baseline.json"))
     parser.add_argument("--dataset-root", type=str, default=None)
     parser.add_argument("--output-dir", type=Path, default=Path("artifacts/baseline-train"))

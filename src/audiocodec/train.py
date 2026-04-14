@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from audiocodec.config import CodecExperimentConfig
 from audiocodec.data.librispeech import SpeechSegmentDataset, build_librispeech_splits
 from audiocodec.losses import CodecLoss
-from audiocodec.models.codec import ConvRVQCodec
+from audiocodec.models.codec import BaseCodecModel, build_codec_model
 
 
 def _load_torchaudio():
@@ -186,7 +186,7 @@ def save_reconstruction_examples(
 
 @torch.no_grad()
 def evaluate(
-    model: ConvRVQCodec,
+    model: BaseCodecModel,
     criterion: CodecLoss,
     dataloader: DataLoader,
     device: torch.device,
@@ -237,7 +237,7 @@ def train_codec(
     resolved_device = resolve_device(device)
     train_loader, val_loader = build_dataloaders(config, limit_train_examples=limit_train_examples)
 
-    model = ConvRVQCodec.from_config(config).to(resolved_device)
+    model = build_codec_model(config).to(resolved_device)
     criterion = build_loss(config).to(resolved_device)
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -246,7 +246,7 @@ def train_codec(
     )
 
     amp_enabled = config.optimization.mixed_precision and resolved_device.type == "cuda"
-    scaler = torch.cuda.amp.GradScaler(enabled=amp_enabled)
+    scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
     train_iterator = cycle_dataloader(train_loader)
     writer = create_tensorboard_writer(output_path, enabled=tensorboard)
 
@@ -275,13 +275,14 @@ def train_codec(
             )
             with autocast_context:
                 output = model(batch)
-                losses = criterion(
-                    reconstruction=output.reconstruction,
-                    target=batch,
-                    commitment_loss=output.commitment_loss,
-                    codebook_loss=output.codebook_loss,
-                )
-                total_loss = losses["total_loss"]
+            # Keep loss computation in fp32 so STFT/mel terms don't hit complex-half instabilities.
+            losses = criterion(
+                reconstruction=output.reconstruction.float(),
+                target=batch.float(),
+                commitment_loss=output.commitment_loss.float(),
+                codebook_loss=output.codebook_loss.float(),
+            )
+            total_loss = losses["total_loss"]
 
             if amp_enabled:
                 scaler.scale(total_loss).backward()

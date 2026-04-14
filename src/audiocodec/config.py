@@ -32,6 +32,7 @@ class AudioConfig:
 
 @dataclass(slots=True)
 class ModelConfig:
+    architecture: str = "conv"
     base_channels: int = 32
     channel_multipliers: tuple[int, ...] = (1, 2, 4, 4)
     encoder_strides: tuple[int, ...] = (5, 4, 4, 2)
@@ -39,16 +40,39 @@ class ModelConfig:
     residual_layers_per_stage: int = 2
     input_kernel_size: int = 7
     output_kernel_size: int = 7
+    seanet_filters: int = 32
+    seanet_ratios: tuple[int, ...] = (8, 5, 4, 2)
+    seanet_residual_layers: int = 1
+    seanet_residual_kernel_size: int = 3
+    seanet_dilation_base: int = 2
+    seanet_compress: int = 2
+    seanet_lstm_layers: int = 2
+    seanet_kernel_size: int = 7
+    seanet_last_kernel_size: int = 7
+    seanet_norm: str = "weight_norm"
 
     def __post_init__(self) -> None:
         self.channel_multipliers = tuple(self.channel_multipliers)
         self.encoder_strides = tuple(self.encoder_strides)
+        self.seanet_ratios = tuple(self.seanet_ratios)
+        if self.architecture not in {"conv", "seanet"}:
+            raise ValueError("architecture must be either 'conv' or 'seanet'.")
         if len(self.channel_multipliers) != len(self.encoder_strides):
             raise ValueError("channel_multipliers and encoder_strides must have the same length.")
         if self.latent_dim <= 0:
             raise ValueError("latent_dim must be positive.")
         if self.residual_layers_per_stage <= 0:
             raise ValueError("residual_layers_per_stage must be positive.")
+        if self.seanet_filters <= 0:
+            raise ValueError("seanet_filters must be positive.")
+        if len(self.seanet_ratios) == 0:
+            raise ValueError("seanet_ratios must not be empty.")
+        if self.seanet_residual_layers <= 0:
+            raise ValueError("seanet_residual_layers must be positive.")
+        if self.seanet_lstm_layers < 0:
+            raise ValueError("seanet_lstm_layers must be non-negative.")
+        if self.seanet_norm not in {"none", "weight_norm"}:
+            raise ValueError("seanet_norm must be either 'none' or 'weight_norm'.")
 
     @property
     def stage_channels(self) -> tuple[int, ...]:
@@ -56,6 +80,8 @@ class ModelConfig:
 
     @property
     def hop_length(self) -> int:
+        if self.architecture == "seanet":
+            return _product(self.seanet_ratios)
         return _product(self.encoder_strides)
 
 
@@ -65,12 +91,22 @@ class RVQConfig:
     num_quantizers: int = 8
     commitment_weight: float = 0.25
     codebook_weight: float = 1.0
+    ema_decay: float = 0.99
+    kmeans_init: bool = False
+    kmeans_iters: int = 20
+    dead_code_threshold: int = 2
 
     def __post_init__(self) -> None:
         if self.codebook_size <= 1:
             raise ValueError("codebook_size must be greater than 1.")
         if self.num_quantizers <= 0:
             raise ValueError("num_quantizers must be positive.")
+        if not 0.0 < self.ema_decay < 1.0:
+            raise ValueError("ema_decay must be between 0 and 1.")
+        if self.kmeans_iters <= 0:
+            raise ValueError("kmeans_iters must be positive.")
+        if self.dead_code_threshold < 0:
+            raise ValueError("dead_code_threshold must be non-negative.")
 
 
 @dataclass(slots=True)

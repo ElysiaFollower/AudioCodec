@@ -1,16 +1,17 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-04-13
+Last reviewed: 2026-04-14
 
 # Linux 训练说明
 
 ## 目标
 
-在 Linux 训练机上完成三件事：
+在 Linux 训练机上完成四件事：
 
 1. 跑通 baseline smoke test
 2. 跑完整 baseline 训练
 3. 跑 mel loss 消融训练并与 baseline 对比
+4. 跑 `encodec-inspired` 主力训练并试听结果
 
 ## 环境
 
@@ -68,6 +69,26 @@ PYTHONPATH=src python scripts/train_codec.py \
   --device cuda \
   --tensorboard
 ```
+
+### 4. Encodec-inspired main run
+
+当 baseline 的试听结果不足以达到“可用”级别时，优先切换到这一路线：
+
+```bash
+PYTHONPATH=src python scripts/train_codec.py \
+  --config configs/encodec-inspired.json \
+  --dataset-root /path/to/LibriSpeech/dev-clean \
+  --output-dir artifacts/linux-encodec-inspired \
+  --device cuda \
+  --tensorboard
+```
+
+这条配置默认使用：
+
+- `SEANet` 风格 encoder / decoder
+- `EMA + k-means init` 的 `RVQ`
+- 约 `12 kbps` 名义码率
+- `mel loss` 作为默认开启的感知增强项
 
 ## 输出目录结构
 

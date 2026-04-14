@@ -12,7 +12,9 @@ Last reviewed: 2026-04-13
 
 - [项目总览](./docs/overview.md)
 - [基线架构说明](./docs/architecture/baseline-neural-codec.md)
+- [Encodec-Inspired 架构说明](./docs/architecture/encodec-inspired-codec.md)
 - [当前执行计划](./plans/active/TASK-001-course-project-bootstrap.md)
+- [Encodec-Inspired 转向计划](./plans/active/TASK-003-encodec-inspired-pivot.md)
 - [范围决策 ADR](./docs/adr/0001-course-project-scope.md)
 
 ## 环境安装
@@ -47,3 +49,12 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 ```bash
 python scripts/train_codec.py --dataset-root /path/to/LibriSpeech/dev-clean --smoke-test
 ```
+
+## 当前实验配置
+
+- `configs/baseline.json`
+  轻量 `Conv + RVQ + Conv` baseline，主要用于最小可交付和消融。
+- `configs/ablation-mel-loss.json`
+  在 baseline 上打开 `mel loss` 的对照实验。
+- `configs/encodec-inspired.json`
+  当前主力路线，使用 `SEANet + EMA RVQ`，目标是把音质提升到可用级别。

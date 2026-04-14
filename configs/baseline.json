@@ -12,6 +12,7 @@
     "eval_clip_seconds": 2.0
   },
   "model": {
+    "architecture": "conv",
     "base_channels": 32,
     "channel_multipliers": [1, 2, 4, 4],
     "encoder_strides": [5, 4, 4, 2],

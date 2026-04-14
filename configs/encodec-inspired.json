@@ -12,20 +12,28 @@
     "eval_clip_seconds": 2.0
   },
   "model": {
-    "architecture": "conv",
-    "base_channels": 32,
-    "channel_multipliers": [1, 2, 4, 4],
-    "encoder_strides": [5, 4, 4, 2],
+    "architecture": "seanet",
     "latent_dim": 128,
-    "residual_layers_per_stage": 2,
-    "input_kernel_size": 7,
-    "output_kernel_size": 7
+    "seanet_filters": 32,
+    "seanet_ratios": [8, 5, 4, 2],
+    "seanet_residual_layers": 1,
+    "seanet_residual_kernel_size": 3,
+    "seanet_dilation_base": 2,
+    "seanet_compress": 2,
+    "seanet_lstm_layers": 2,
+    "seanet_kernel_size": 7,
+    "seanet_last_kernel_size": 7,
+    "seanet_norm": "weight_norm"
   },
   "quantizer": {
-    "codebook_size": 256,
-    "num_quantizers": 8,
+    "codebook_size": 1024,
+    "num_quantizers": 24,
     "commitment_weight": 0.25,
-    "codebook_weight": 1.0
+    "codebook_weight": 0.0,
+    "ema_decay": 0.99,
+    "kmeans_init": true,
+    "kmeans_iters": 20,
+    "dead_code_threshold": 2
   },
   "loss": {
     "waveform_weight": 1.0,
@@ -39,16 +47,16 @@
     "mel_f_max": null
   },
   "optimization": {
-    "learning_rate": 0.0002,
+    "learning_rate": 0.0003,
     "weight_decay": 0.0001,
-    "batch_size": 16,
-    "smoke_test_steps": 500,
-    "main_steps": 5000,
+    "batch_size": 8,
+    "smoke_test_steps": 200,
+    "main_steps": 20000,
     "mixed_precision": true,
-    "eval_interval": 500,
-    "checkpoint_interval": 500,
+    "eval_interval": 1000,
+    "checkpoint_interval": 1000,
     "log_interval": 50,
-    "num_workers": 0,
+    "num_workers": 8,
     "max_eval_batches": 8,
     "seed": 1337
   }
