@@ -171,6 +171,7 @@ echo "LOG=$LOG"
 - `EMA + k-means init` 的 `RVQ`
 - 约 `12 kbps` 名义码率
 - `mel loss` 作为默认开启的感知增强项
+- 默认关闭 `mixed precision`，优先保证数值稳定
 
 ## 输出目录结构
 

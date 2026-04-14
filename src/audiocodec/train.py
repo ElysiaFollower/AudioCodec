@@ -191,8 +191,10 @@ def save_reconstruction_examples(
     sample_dir.mkdir(parents=True, exist_ok=True)
     source_path = sample_dir / f"step-{step:06d}-source.wav"
     recon_path = sample_dir / f"step-{step:06d}-reconstruction.wav"
-    torchaudio.save(str(source_path), source[0].cpu().clamp(-1.0, 1.0), sample_rate)
-    torchaudio.save(str(recon_path), reconstruction[0].cpu().clamp(-1.0, 1.0), sample_rate)
+    source_audio = source[0].detach().float().cpu().clamp(-1.0, 1.0)
+    reconstruction_audio = reconstruction[0].detach().float().cpu().clamp(-1.0, 1.0)
+    torchaudio.save(str(source_path), source_audio, sample_rate)
+    torchaudio.save(str(recon_path), reconstruction_audio, sample_rate)
 
 
 @torch.no_grad()
@@ -237,6 +239,13 @@ def evaluate(
 
     averages = {name: total / num_batches for name, total in totals.items()}
     return averages, preview
+
+
+def _ensure_finite_metrics(metrics: dict[str, torch.Tensor] | dict[str, float], split: str, step: int) -> None:
+    for name, value in metrics.items():
+        numeric = float(value.item()) if isinstance(value, torch.Tensor) else float(value)
+        if not torch.isfinite(torch.tensor(numeric)):
+            raise FloatingPointError(f"Non-finite {split} metric `{name}` detected at step {step}.")
 
 
 def train_codec(
@@ -322,6 +331,7 @@ def train_codec(
                 codebook_loss=output.codebook_loss.float(),
             )
             total_loss = losses["total_loss"]
+            _ensure_finite_metrics(losses, split="train", step=step)
 
             if amp_enabled:
                 scaler.scale(total_loss).backward()
@@ -358,6 +368,7 @@ def train_codec(
                     max_batches=config.optimization.max_eval_batches,
                     amp_enabled=amp_enabled,
                 )
+                _ensure_finite_metrics(val_metrics, split="val", step=step)
                 append_metrics(metrics_path, {"split": "val", "step": step, **val_metrics})
                 if writer is not None:
                     for name, value in val_metrics.items():

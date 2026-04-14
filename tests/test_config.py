@@ -27,6 +27,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.frame_rate, 50)
         self.assertEqual(config.quantizer.codebook_size, 1024)
         self.assertEqual(config.quantizer.num_quantizers, 24)
+        self.assertFalse(config.optimization.mixed_precision)
 
 
 if __name__ == "__main__":
