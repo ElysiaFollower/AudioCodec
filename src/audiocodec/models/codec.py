@@ -1,4 +1,4 @@
-"""Baseline Conv + RVQ + Conv codec model."""
+"""Codec model definitions and factories."""
 
 from __future__ import annotations
 
@@ -11,7 +11,8 @@ from torch.nn import functional as F
 from audiocodec.config import CodecExperimentConfig, ModelConfig, RVQConfig
 
 from .blocks import ResidualUnit1d, normalization, stride_to_conv_params
-from .quantizer import ResidualVectorQuantizer
+from .quantizer import EMAResidualVectorQuantizer, RVQOutput, ResidualVectorQuantizer
+from .seanet import SEANetDecoder, SEANetEncoder
 
 
 @dataclass(slots=True)
@@ -128,32 +129,25 @@ class ConvDecoder(nn.Module):
         return self.output(hidden)
 
 
-class ConvRVQCodec(nn.Module):
-    """Speech codec baseline with a convolutional autoencoder and RVQ bottleneck."""
+class BaseCodecModel(nn.Module):
+    """Common padding, encode/decode, and forward logic for waveform codecs."""
 
-    def __init__(self, sample_rate: int, channels: int, model_config: ModelConfig, rvq_config: RVQConfig) -> None:
+    def __init__(
+        self,
+        sample_rate: int,
+        channels: int,
+        model_config: ModelConfig,
+        encoder: nn.Module,
+        decoder: nn.Module,
+        quantizer: nn.Module,
+    ) -> None:
         super().__init__()
         self.sample_rate = sample_rate
         self.channels = channels
         self.model_config = model_config
-        self.rvq_config = rvq_config
-
-        self.encoder = ConvEncoder(channels=channels, config=model_config)
-        self.quantizer = ResidualVectorQuantizer(
-            dimension=model_config.latent_dim,
-            num_quantizers=rvq_config.num_quantizers,
-            codebook_size=rvq_config.codebook_size,
-        )
-        self.decoder = ConvDecoder(channels=channels, config=model_config)
-
-    @classmethod
-    def from_config(cls, config: CodecExperimentConfig) -> "ConvRVQCodec":
-        return cls(
-            sample_rate=config.audio.sample_rate,
-            channels=config.audio.channels,
-            model_config=config.model,
-            rvq_config=config.quantizer,
-        )
+        self.encoder = encoder
+        self.decoder = decoder
+        self.quantizer = quantizer
 
     @property
     def hop_length(self) -> int:
@@ -169,6 +163,9 @@ class ConvRVQCodec(nn.Module):
         if waveform.shape[1] != self.channels:
             raise ValueError("waveform channel count does not match the model configuration.")
 
+        if self.model_config.architecture == "seanet":
+            return waveform, 0
+
         original_length = waveform.shape[-1]
         remainder = original_length % self.hop_length
         if remainder == 0:
@@ -180,10 +177,11 @@ class ConvRVQCodec(nn.Module):
         padded_waveform, pad_amount = self._pad_waveform(waveform)
         latent = self.encoder(padded_waveform)
         codes = self.quantizer.encode(latent)
+        padded_length = latent.shape[-1] * self.hop_length
         return EncodedAudio(
             codes=codes,
             original_length=waveform.shape[-1],
-            padded_length=waveform.shape[-1] + pad_amount,
+            padded_length=padded_length,
         )
 
     def decode(self, codes: torch.Tensor, length: int | None = None) -> torch.Tensor:
@@ -196,10 +194,12 @@ class ConvRVQCodec(nn.Module):
     def forward(self, waveform: torch.Tensor) -> CodecOutput:
         padded_waveform, pad_amount = self._pad_waveform(waveform)
         latent = self.encoder(padded_waveform)
-        rvq_output = self.quantizer(latent)
+        rvq_output: RVQOutput = self.quantizer(latent)
         reconstruction = self.decoder(rvq_output.quantized)
-        if pad_amount:
+        padded_length = latent.shape[-1] * self.hop_length
+        if pad_amount and self.model_config.architecture != "seanet":
             reconstruction = reconstruction[..., :-pad_amount]
+        reconstruction = reconstruction[..., : waveform.shape[-1]]
         return CodecOutput(
             reconstruction=reconstruction,
             codes=rvq_output.codes,
@@ -208,6 +208,102 @@ class ConvRVQCodec(nn.Module):
             commitment_loss=rvq_output.commitment_loss,
             codebook_loss=rvq_output.codebook_loss,
             original_length=waveform.shape[-1],
-            padded_length=padded_waveform.shape[-1],
+            padded_length=padded_length,
         )
 
+
+class ConvRVQCodec(BaseCodecModel):
+    """Speech codec baseline with a convolutional autoencoder and RVQ bottleneck."""
+
+    def __init__(self, sample_rate: int, channels: int, model_config: ModelConfig, rvq_config: RVQConfig) -> None:
+        super().__init__(
+            sample_rate=sample_rate,
+            channels=channels,
+            model_config=model_config,
+            encoder=ConvEncoder(channels=channels, config=model_config),
+            decoder=ConvDecoder(channels=channels, config=model_config),
+            quantizer=ResidualVectorQuantizer(
+                dimension=model_config.latent_dim,
+                num_quantizers=rvq_config.num_quantizers,
+                codebook_size=rvq_config.codebook_size,
+            ),
+        )
+
+    @classmethod
+    def from_config(cls, config: CodecExperimentConfig) -> "ConvRVQCodec":
+        return cls(
+            sample_rate=config.audio.sample_rate,
+            channels=config.audio.channels,
+            model_config=config.model,
+            rvq_config=config.quantizer,
+        )
+
+
+class SEANetRVQCodec(BaseCodecModel):
+    """Encodec-inspired SEANet codec with EMA-based residual vector quantization."""
+
+    def __init__(self, sample_rate: int, channels: int, model_config: ModelConfig, rvq_config: RVQConfig) -> None:
+        encoder = SEANetEncoder(
+            channels=channels,
+            dimension=model_config.latent_dim,
+            n_filters=model_config.seanet_filters,
+            ratios=model_config.seanet_ratios,
+            residual_layers=model_config.seanet_residual_layers,
+            residual_kernel_size=model_config.seanet_residual_kernel_size,
+            dilation_base=model_config.seanet_dilation_base,
+            compress=model_config.seanet_compress,
+            lstm_layers=model_config.seanet_lstm_layers,
+            kernel_size=model_config.seanet_kernel_size,
+            last_kernel_size=model_config.seanet_last_kernel_size,
+            norm=model_config.seanet_norm,
+            true_skip=model_config.seanet_true_skip,
+        )
+        decoder = SEANetDecoder(
+            channels=channels,
+            dimension=model_config.latent_dim,
+            n_filters=model_config.seanet_filters,
+            ratios=model_config.seanet_ratios,
+            residual_layers=model_config.seanet_residual_layers,
+            residual_kernel_size=model_config.seanet_residual_kernel_size,
+            dilation_base=model_config.seanet_dilation_base,
+            compress=model_config.seanet_compress,
+            lstm_layers=model_config.seanet_lstm_layers,
+            kernel_size=model_config.seanet_kernel_size,
+            last_kernel_size=model_config.seanet_last_kernel_size,
+            norm=model_config.seanet_norm,
+            true_skip=model_config.seanet_true_skip,
+        )
+        quantizer = EMAResidualVectorQuantizer(
+            dimension=model_config.latent_dim,
+            num_quantizers=rvq_config.num_quantizers,
+            codebook_size=rvq_config.codebook_size,
+            decay=rvq_config.ema_decay,
+            kmeans_init=rvq_config.kmeans_init,
+            kmeans_iters=rvq_config.kmeans_iters,
+            dead_code_threshold=rvq_config.dead_code_threshold,
+        )
+        super().__init__(
+            sample_rate=sample_rate,
+            channels=channels,
+            model_config=model_config,
+            encoder=encoder,
+            decoder=decoder,
+            quantizer=quantizer,
+        )
+
+    @classmethod
+    def from_config(cls, config: CodecExperimentConfig) -> "SEANetRVQCodec":
+        return cls(
+            sample_rate=config.audio.sample_rate,
+            channels=config.audio.channels,
+            model_config=config.model,
+            rvq_config=config.quantizer,
+        )
+
+
+def build_codec_model(config: CodecExperimentConfig) -> BaseCodecModel:
+    if config.model.architecture == "conv":
+        return ConvRVQCodec.from_config(config)
+    if config.model.architecture == "seanet":
+        return SEANetRVQCodec.from_config(config)
+    raise ValueError(f"Unsupported model architecture: {config.model.architecture}")

@@ -1,8 +1,12 @@
 Owner: ely
-Status: active
-Last reviewed: 2026-04-13
+Status: archived
+Last reviewed: 2026-04-14
 
 # TASK-002: Linux 训练 handoff 与 mel loss 消融
+
+## Archive Note
+
+Linux 训练 handoff、mel 消融配置和稳定操作手册已经落地；后续实验不再以本计划为主线推进。
 
 ## 目标
 

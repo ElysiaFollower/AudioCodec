@@ -14,13 +14,14 @@ from audiocodec.config import load_experiment_config
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train the Conv + RVQ speech codec baseline.")
+    parser = argparse.ArgumentParser(description="Train an AudioCodec speech codec experiment.")
     parser.add_argument("--config", type=Path, default=Path("configs/baseline.json"))
     parser.add_argument("--dataset-root", type=str, default=None)
     parser.add_argument("--output-dir", type=Path, default=Path("artifacts/baseline-train"))
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--smoke-test", action="store_true")
     parser.add_argument("--limit-train-examples", type=int, default=None)
+    parser.add_argument("--overfit-example-path", type=str, default=None)
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--tensorboard", action="store_true")
     return parser.parse_args()
@@ -47,6 +48,7 @@ def main() -> None:
         steps=args.steps,
         smoke_test=args.smoke_test,
         limit_train_examples=args.limit_train_examples,
+        overfit_example_path=args.overfit_example_path,
         device=args.device,
         tensorboard=args.tensorboard,
     )

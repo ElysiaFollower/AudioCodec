@@ -3,7 +3,7 @@
 from pathlib import Path
 import unittest
 
-from audiocodec.data.splits import AudioExample, build_duration_capped_splits
+from audiocodec.data.splits import AudioExample, build_duration_capped_splits, build_overfit_splits
 
 
 class SplitBuilderTests(unittest.TestCase):
@@ -29,6 +29,14 @@ class SplitBuilderTests(unittest.TestCase):
         examples = [AudioExample(path=Path("a.flac"), duration_seconds=10)]
         with self.assertRaises(ValueError):
             build_duration_capped_splits(examples=examples, train_minutes=1, val_minutes=1, test_minutes=1)
+
+    def test_build_overfit_splits_reuses_same_example(self) -> None:
+        example = AudioExample(path=Path("debug.flac"), duration_seconds=12.5)
+        splits = build_overfit_splits(example)
+
+        self.assertEqual(splits.train, [example])
+        self.assertEqual(splits.val, [example])
+        self.assertEqual(splits.test, [example])
 
 
 if __name__ == "__main__":

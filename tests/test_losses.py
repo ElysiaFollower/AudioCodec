@@ -2,11 +2,18 @@
 
 import unittest
 
-import torch
+try:
+    import torch
+except ModuleNotFoundError:
+    torch = None
 
-from audiocodec.losses import CodecLoss
+if torch is not None:
+    from audiocodec.losses import CodecLoss
+else:
+    CodecLoss = None
 
 
+@unittest.skipIf(torch is None, "torch is not installed")
 class CodecLossTests(unittest.TestCase):
     def test_codec_loss_reports_zero_mel_when_disabled(self) -> None:
         criterion = CodecLoss(

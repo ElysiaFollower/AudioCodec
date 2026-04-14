@@ -14,9 +14,13 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from audiocodec.config import CodecExperimentConfig
-from audiocodec.data.librispeech import SpeechSegmentDataset, build_librispeech_splits
+from audiocodec.data.librispeech import (
+    SpeechSegmentDataset,
+    build_librispeech_splits,
+    build_single_file_overfit_splits,
+)
 from audiocodec.losses import CodecLoss
-from audiocodec.models.codec import ConvRVQCodec
+from audiocodec.models.codec import BaseCodecModel, build_codec_model
 
 
 def _load_torchaudio():
@@ -59,16 +63,21 @@ def cycle_dataloader(dataloader: DataLoader):
 def build_dataloaders(
     config: CodecExperimentConfig,
     limit_train_examples: int | None = None,
+    overfit_example_path: str | None = None,
 ) -> tuple[DataLoader, DataLoader]:
-    splits = build_librispeech_splits(
-        root=config.dataset.root,
-        train_minutes=config.dataset.train_minutes,
-        val_minutes=config.dataset.val_minutes,
-        test_minutes=config.dataset.test_minutes,
-    )
+    overfit_mode = overfit_example_path is not None
+    if overfit_mode:
+        splits = build_single_file_overfit_splits(overfit_example_path)
+    else:
+        splits = build_librispeech_splits(
+            root=config.dataset.root,
+            train_minutes=config.dataset.train_minutes,
+            val_minutes=config.dataset.val_minutes,
+            test_minutes=config.dataset.test_minutes,
+        )
 
     train_examples = splits.train
-    if limit_train_examples is not None:
+    if limit_train_examples is not None and not overfit_mode:
         train_examples = train_examples[:limit_train_examples]
         if not train_examples:
             raise ValueError("limit_train_examples truncated the training split to zero examples.")
@@ -78,29 +87,31 @@ def build_dataloaders(
         sample_rate=config.audio.sample_rate,
         channels=config.audio.channels,
         clip_seconds=config.audio.train_clip_seconds,
-        random_crop=True,
+        random_crop=not overfit_mode,
     )
     val_dataset = SpeechSegmentDataset(
-        examples=splits.val,
+        examples=train_examples if overfit_mode else splits.val,
         sample_rate=config.audio.sample_rate,
         channels=config.audio.channels,
         clip_seconds=config.audio.eval_clip_seconds,
         random_crop=False,
     )
 
+    batch_size = 1 if overfit_mode else config.optimization.batch_size
+    num_workers = 0 if overfit_mode else config.optimization.num_workers
     train_loader = DataLoader(
         train_dataset,
-        batch_size=config.optimization.batch_size,
-        shuffle=True,
-        num_workers=config.optimization.num_workers,
+        batch_size=batch_size,
+        shuffle=not overfit_mode,
+        num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         drop_last=False,
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=config.optimization.batch_size,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=config.optimization.num_workers,
+        num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         drop_last=False,
     )
@@ -180,17 +191,20 @@ def save_reconstruction_examples(
     sample_dir.mkdir(parents=True, exist_ok=True)
     source_path = sample_dir / f"step-{step:06d}-source.wav"
     recon_path = sample_dir / f"step-{step:06d}-reconstruction.wav"
-    torchaudio.save(str(source_path), source[0].cpu().clamp(-1.0, 1.0), sample_rate)
-    torchaudio.save(str(recon_path), reconstruction[0].cpu().clamp(-1.0, 1.0), sample_rate)
+    source_audio = source[0].detach().float().cpu().clamp(-1.0, 1.0)
+    reconstruction_audio = reconstruction[0].detach().float().cpu().clamp(-1.0, 1.0)
+    torchaudio.save(str(source_path), source_audio, sample_rate)
+    torchaudio.save(str(recon_path), reconstruction_audio, sample_rate)
 
 
 @torch.no_grad()
 def evaluate(
-    model: ConvRVQCodec,
+    model: BaseCodecModel,
     criterion: CodecLoss,
     dataloader: DataLoader,
     device: torch.device,
     max_batches: int,
+    amp_enabled: bool,
 ) -> tuple[dict[str, float], tuple[torch.Tensor, torch.Tensor] | None]:
     model.eval()
 
@@ -199,12 +213,18 @@ def evaluate(
     preview: tuple[torch.Tensor, torch.Tensor] | None = None
     for batch in dataloader:
         batch = batch.to(device)
-        output = model(batch)
+        autocast_context = (
+            torch.autocast(device_type="cuda", dtype=torch.float16)
+            if amp_enabled
+            else nullcontext()
+        )
+        with autocast_context:
+            output = model(batch)
         losses = criterion(
-            reconstruction=output.reconstruction,
-            target=batch,
-            commitment_loss=output.commitment_loss,
-            codebook_loss=output.codebook_loss,
+            reconstruction=output.reconstruction.float(),
+            target=batch.float(),
+            commitment_loss=output.commitment_loss.float(),
+            codebook_loss=output.codebook_loss.float(),
         )
         for name, value in losses.items():
             totals[name] = totals.get(name, 0.0) + float(value.item())
@@ -221,23 +241,41 @@ def evaluate(
     return averages, preview
 
 
+def _ensure_finite_metrics(metrics: dict[str, torch.Tensor] | dict[str, float], split: str, step: int) -> None:
+    for name, value in metrics.items():
+        numeric = float(value.item()) if isinstance(value, torch.Tensor) else float(value)
+        if not torch.isfinite(torch.tensor(numeric)):
+            raise FloatingPointError(f"Non-finite {split} metric `{name}` detected at step {step}.")
+
+
 def train_codec(
     config: CodecExperimentConfig,
     output_dir: str | Path,
     steps: int | None = None,
     smoke_test: bool = False,
     limit_train_examples: int | None = None,
+    overfit_example_path: str | None = None,
     device: str | None = None,
     tensorboard: bool = False,
 ) -> TrainingArtifacts:
     output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
+    metrics_path = output_path / "metrics.jsonl"
+    if metrics_path.exists():
+        raise FileExistsError(
+            f"Output directory {output_path} already contains metrics.jsonl. "
+            "Use a fresh --output-dir because resume/mixed-run logging is not supported."
+        )
 
     set_seed(config.optimization.seed)
     resolved_device = resolve_device(device)
-    train_loader, val_loader = build_dataloaders(config, limit_train_examples=limit_train_examples)
+    train_loader, val_loader = build_dataloaders(
+        config,
+        limit_train_examples=limit_train_examples,
+        overfit_example_path=overfit_example_path,
+    )
 
-    model = ConvRVQCodec.from_config(config).to(resolved_device)
+    model = build_codec_model(config).to(resolved_device)
     criterion = build_loss(config).to(resolved_device)
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -246,15 +284,25 @@ def train_codec(
     )
 
     amp_enabled = config.optimization.mixed_precision and resolved_device.type == "cuda"
-    scaler = torch.cuda.amp.GradScaler(enabled=amp_enabled)
+    scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
     train_iterator = cycle_dataloader(train_loader)
     writer = create_tensorboard_writer(output_path, enabled=tensorboard)
 
     resolved_config_path = output_path / "resolved_config.json"
-    metrics_path = output_path / "metrics.jsonl"
-    resolved_config_path.write_text(json.dumps(config.to_dict(), indent=2))
+    resolved_payload = config.to_dict()
+    if overfit_example_path is not None:
+        resolved_payload.setdefault("debug", {})
+        resolved_payload["debug"].update(
+            {
+                "overfit_example_path": str(Path(overfit_example_path).expanduser().resolve()),
+                "effective_batch_size": 1,
+                "effective_num_workers": 0,
+                "random_crop": False,
+            }
+        )
+    resolved_config_path.write_text(json.dumps(resolved_payload, indent=2))
     if writer is not None:
-        writer.add_text("config/json", json.dumps(config.to_dict(), indent=2))
+        writer.add_text("config/json", json.dumps(resolved_payload, indent=2))
 
     total_steps = steps
     if total_steps is None:
@@ -275,13 +323,15 @@ def train_codec(
             )
             with autocast_context:
                 output = model(batch)
-                losses = criterion(
-                    reconstruction=output.reconstruction,
-                    target=batch,
-                    commitment_loss=output.commitment_loss,
-                    codebook_loss=output.codebook_loss,
-                )
-                total_loss = losses["total_loss"]
+            # Keep loss computation in fp32 so STFT/mel terms don't hit complex-half instabilities.
+            losses = criterion(
+                reconstruction=output.reconstruction.float(),
+                target=batch.float(),
+                commitment_loss=output.commitment_loss.float(),
+                codebook_loss=output.codebook_loss.float(),
+            )
+            total_loss = losses["total_loss"]
+            _ensure_finite_metrics(losses, split="train", step=step)
 
             if amp_enabled:
                 scaler.scale(total_loss).backward()
@@ -316,7 +366,9 @@ def train_codec(
                     dataloader=val_loader,
                     device=resolved_device,
                     max_batches=config.optimization.max_eval_batches,
+                    amp_enabled=amp_enabled,
                 )
+                _ensure_finite_metrics(val_metrics, split="val", step=step)
                 append_metrics(metrics_path, {"split": "val", "step": step, **val_metrics})
                 if writer is not None:
                     for name, value in val_metrics.items():

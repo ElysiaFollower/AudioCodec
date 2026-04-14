@@ -1,8 +1,12 @@
 Owner: ely
-Status: active
-Last reviewed: 2026-04-13
+Status: archived
+Last reviewed: 2026-04-14
 
 # TASK-001: 课程项目基线企划与执行计划
+
+## Archive Note
+
+课程 baseline 方案、文档骨架和执行路径已经完成并沉淀到仓库，不再作为当前活动计划维护。
 
 ## 目标
 

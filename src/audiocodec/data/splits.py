@@ -20,6 +20,12 @@ class DatasetSplits:
     test: list[AudioExample]
 
 
+def build_overfit_splits(example: AudioExample) -> DatasetSplits:
+    """Reuse one example across train/val/test for debugging overfit behavior."""
+
+    return DatasetSplits(train=[example], val=[example], test=[example])
+
+
 def _take_examples_until_duration(
     examples: list[AudioExample],
     target_seconds: float,
@@ -55,4 +61,3 @@ def build_duration_capped_splits(
     test, _ = _take_examples_until_duration(ordered_examples, test_minutes * 60, index)
 
     return DatasetSplits(train=train, val=val, test=test)
-
