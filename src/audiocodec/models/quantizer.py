@@ -133,15 +133,15 @@ def _run_kmeans(samples: torch.Tensor, num_centroids: int, num_iters: int) -> tu
             samples.pow(2).sum(dim=1, keepdim=True)
             - 2 * samples @ centroids.t()
             + centroids.pow(2).sum(dim=1)
-        )
+        ).clamp_min_(0)
         assignments = torch.argmin(distances, dim=1)
         counts = torch.bincount(assignments, minlength=num_centroids)
-        updated = centroids.clone()
-        for centroid_index in range(num_centroids):
-            mask = assignments == centroid_index
-            if mask.any():
-                updated[centroid_index] = samples[mask].mean(dim=0)
-        centroids = updated
+        zero_mask = counts == 0
+        counts_clamped = counts.masked_fill(zero_mask, 1).to(samples.dtype)
+        updated = samples.new_zeros(num_centroids, samples.shape[1])
+        updated.scatter_add_(0, assignments[:, None].expand(-1, samples.shape[1]), samples)
+        updated = updated / counts_clamped[:, None]
+        centroids = torch.where(zero_mask[:, None], centroids, updated)
     return centroids, counts
 
 
@@ -187,7 +187,7 @@ class EMACodebook(nn.Module):
             flat_inputs.pow(2).sum(dim=1, keepdim=True)
             - 2 * flat_inputs @ self.embedding.t()
             + self.embedding.pow(2).sum(dim=1)
-        )
+        ).clamp_min_(0)
         return torch.argmin(distances, dim=1)
 
     @torch.no_grad()
