@@ -176,7 +176,7 @@ class EMACodebook(nn.Module):
     def _maybe_initialize(self, flat_inputs: torch.Tensor) -> None:
         if bool(self.initialized.item()):
             return
-        centroids, counts = _run_kmeans(flat_inputs, self.size, self.kmeans_iters)
+        centroids, counts = _run_kmeans(flat_inputs.to(self.embedding.dtype), self.size, self.kmeans_iters)
         self.embedding.copy_(centroids)
         self.embedding_avg.copy_(centroids)
         self.cluster_size.copy_(counts.to(self.cluster_size.dtype))
@@ -197,7 +197,7 @@ class EMACodebook(nn.Module):
         dead_mask = self.cluster_size < self.dead_code_threshold
         if not dead_mask.any():
             return
-        replacements = _sample_vectors(flat_inputs, int(dead_mask.sum().item()))
+        replacements = _sample_vectors(flat_inputs, int(dead_mask.sum().item())).to(self.embedding.dtype)
         self.embedding[dead_mask] = replacements
         self.embedding_avg[dead_mask] = replacements
         self.cluster_size[dead_mask] = float(self.dead_code_threshold)
@@ -226,8 +226,9 @@ class EMACodebook(nn.Module):
         if inputs.ndim != 3:
             raise ValueError("inputs must have shape [batch, channels, frames].")
 
+        input_dtype = inputs.dtype
         batch_size, channels, frames = inputs.shape
-        flat_inputs = inputs.transpose(1, 2).reshape(-1, channels)
+        flat_inputs = inputs.transpose(1, 2).reshape(-1, channels).to(self.embedding.dtype)
         if self.training:
             self._maybe_initialize(flat_inputs)
 
@@ -237,14 +238,15 @@ class EMACodebook(nn.Module):
         if self.training:
             self._ema_update(flat_inputs, flat_indices)
 
-        commitment_loss = F.mse_loss(inputs, quantized.detach())
+        commitment_loss = F.mse_loss(inputs.float(), quantized.detach().float())
+        quantized = quantized.to(input_dtype)
         quantized = inputs + (quantized - inputs).detach()
         return quantized, flat_indices.view(batch_size, frames), commitment_loss
 
     @torch.no_grad()
     def encode(self, inputs: torch.Tensor) -> torch.Tensor:
         batch_size, channels, frames = inputs.shape
-        flat_inputs = inputs.transpose(1, 2).reshape(-1, channels)
+        flat_inputs = inputs.transpose(1, 2).reshape(-1, channels).to(self.embedding.dtype)
         self._maybe_initialize(flat_inputs)
         return self._compute_indices(flat_inputs).view(batch_size, frames)
 
@@ -311,7 +313,7 @@ class EMAResidualVectorQuantizer(nn.Module):
         codes: list[torch.Tensor] = []
         for codebook in self.codebooks:
             stage_codes = codebook.encode(residual)
-            stage_quantized = codebook.decode(stage_codes)
+            stage_quantized = codebook.decode(stage_codes).to(residual.dtype)
             codes.append(stage_codes)
             residual = residual - stage_quantized
         return torch.stack(codes, dim=1)

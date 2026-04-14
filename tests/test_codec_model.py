@@ -38,6 +38,18 @@ class ConvRVQCodecTests(unittest.TestCase):
     def test_seanet_round_trip(self) -> None:
         self._assert_round_trip("configs/encodec-inspired.json", waveform_length=48_321)
 
+    def test_seanet_quantizer_handles_autocast_dtype(self) -> None:
+        config = load_experiment_config("configs/encodec-inspired.json")
+        model = build_codec_model(config)
+        model.train()
+
+        waveform = torch.randn(2, config.audio.channels, 6_400)
+        with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+            output = model(waveform)
+
+        self.assertEqual(output.reconstruction.dtype, torch.bfloat16)
+        self.assertEqual(output.codes.shape[1], config.quantizer.num_quantizers)
+
 
 if __name__ == "__main__":
     unittest.main()
