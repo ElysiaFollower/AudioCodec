@@ -1,8 +1,12 @@
 Owner: ely
-Status: active
+Status: archived
 Last reviewed: 2026-04-14
 
 # TASK-003 Encodec-Inspired Pivot
+
+## Archive Note
+
+`encodec-inspired` 路线已经完成实现、训练与试听验证。结果表明单样本 overfit 可行，但全数据训练仍存在明显音质缺口；后续工作将以新的对齐计划继续推进，而不是继续沿用本计划。
 
 ## Goal
 

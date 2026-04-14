@@ -1,8 +1,12 @@
 Owner: ely
-Status: active
+Status: archived
 Last reviewed: 2026-04-14
 
 # TASK-004 Encodec-Like Loss Ablation
+
+## Archive Note
+
+本实验已完成一次短程 overfit 验机，证明 `encodec-like` loss 方向值得保留，但不足以单独解决全数据训练音质问题；后续将把该结论并入新的系统性对齐计划。
 
 ## Goal
 
