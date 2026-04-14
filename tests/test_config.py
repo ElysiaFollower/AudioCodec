@@ -48,6 +48,13 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.adversarial.adversarial_weight, 4.0)
         self.assertEqual(config.adversarial.feature_matching_weight, 4.0)
 
+    def test_balanced_adversarial_config_enables_local_balancer(self) -> None:
+        config = load_experiment_config(Path("configs/ablation-adversarial-msstft-balanced.json"))
+        self.assertTrue(config.adversarial.enabled)
+        self.assertTrue(config.balancer.enabled)
+        self.assertEqual(config.adversarial.n_ffts, (1024, 2048, 512, 256, 128))
+        self.assertEqual(config.balancer.total_norm, 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

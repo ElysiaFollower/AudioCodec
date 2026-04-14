@@ -54,6 +54,8 @@ Current status:
 - `src/audiocodec/adversarial.py` 已新增最小 `MS-STFT discriminator`
 - `train.py` 已支持可选 generator/discriminator 双优化器训练
 - 新实验配置：[configs/ablation-adversarial-msstft.json](/Users/ely/workspace/research/audio/AudioCodec/configs/ablation-adversarial-msstft.json)
+- 已补充本地 `Balancer`，用于更接近 reference 的多损失梯度配平
+- 新增平衡版实验配置：[configs/ablation-adversarial-msstft-balanced.json](/Users/ely/workspace/research/audio/AudioCodec/configs/ablation-adversarial-msstft-balanced.json)
 - 旧配置默认不启用 adversarial training
 
 ### Phase 2: Controlled Ablation
@@ -103,6 +105,28 @@ CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
   --tensorboard
 ```
 
+平衡版单样本 overfit：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
+  --config configs/ablation-adversarial-msstft-balanced.json \
+  --output-dir artifacts/debug-overfit-adversarial-msstft-balanced \
+  --steps 4000 \
+  --device cuda \
+  --overfit-example-path /absolute/path/to/example.flac \
+  --tensorboard
+```
+
+平衡版小规模全数据训练：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
+  --config configs/ablation-adversarial-msstft-balanced.json \
+  --output-dir artifacts/linux-adversarial-msstft-balanced \
+  --device cuda \
+  --tensorboard
+```
+
 ## Immediate Next Step
 
-先用 `ablation-adversarial-msstft` 路线做一次单样本 overfit 和一次小规模全数据训练，对比当前 `encodec-inspired` 是否显著减轻电流音和高频沙砾感。
+先用 `ablation-adversarial-msstft-balanced` 路线做一次单样本 overfit 和一次小规模全数据训练，检查是否能避免当前未平衡 adversarial 训练中的静音塌缩。

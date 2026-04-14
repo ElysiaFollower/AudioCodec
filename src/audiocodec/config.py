@@ -175,6 +175,24 @@ class AdversarialConfig:
 
 
 @dataclass(slots=True)
+class BalancerConfig:
+    enabled: bool = False
+    balance_grads: bool = True
+    ema_decay: float = 0.999
+    total_norm: float = 1.0
+    per_batch_item: bool = True
+    epsilon: float = 1e-12
+
+    def __post_init__(self) -> None:
+        if not 0.0 < self.ema_decay <= 1.0:
+            raise ValueError("ema_decay must be in (0, 1].")
+        if self.total_norm <= 0:
+            raise ValueError("total_norm must be positive.")
+        if self.epsilon <= 0:
+            raise ValueError("epsilon must be positive.")
+
+
+@dataclass(slots=True)
 class OptimizationConfig:
     learning_rate: float = 2e-4
     weight_decay: float = 1e-4
@@ -198,6 +216,7 @@ class CodecExperimentConfig:
     quantizer: RVQConfig = field(default_factory=RVQConfig)
     loss: LossConfig = field(default_factory=LossConfig)
     adversarial: AdversarialConfig = field(default_factory=AdversarialConfig)
+    balancer: BalancerConfig = field(default_factory=BalancerConfig)
     optimization: OptimizationConfig = field(default_factory=OptimizationConfig)
 
     @property
@@ -216,6 +235,7 @@ class CodecExperimentConfig:
             quantizer=RVQConfig(**payload.get("quantizer", {})),
             loss=LossConfig(**payload.get("loss", {})),
             adversarial=AdversarialConfig(**payload.get("adversarial", {})),
+            balancer=BalancerConfig(**payload.get("balancer", {})),
             optimization=OptimizationConfig(**payload.get("optimization", {})),
         )
 

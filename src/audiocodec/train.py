@@ -19,6 +19,7 @@ from audiocodec.adversarial import (
     discriminator_adversarial_loss,
     generator_adversarial_loss,
 )
+from audiocodec.balancer import Balancer
 from audiocodec.config import CodecExperimentConfig
 from audiocodec.data.librispeech import (
     SpeechSegmentDataset,
@@ -48,6 +49,31 @@ class AdversarialComponents:
     discriminator: MultiScaleSTFTDiscriminator
     optimizer: torch.optim.Optimizer
     feature_matching_loss: FeatureMatchingLoss
+
+
+def build_balancer(config: CodecExperimentConfig) -> Balancer | None:
+    if not config.balancer.enabled:
+        return None
+
+    weights: dict[str, float] = {}
+    if config.loss.waveform_weight > 0:
+        weights["waveform_loss"] = config.loss.waveform_weight
+    if config.loss.stft_weight > 0:
+        weights["stft_loss"] = config.loss.stft_weight
+    if config.loss.mel_weight > 0:
+        weights["mel_loss"] = config.loss.mel_weight
+    if config.adversarial.enabled and config.adversarial.adversarial_weight > 0:
+        weights["generator_adversarial_loss"] = config.adversarial.adversarial_weight
+    if config.adversarial.enabled and config.adversarial.feature_matching_weight > 0:
+        weights["feature_matching_loss"] = config.adversarial.feature_matching_weight
+    return Balancer(
+        weights=weights,
+        balance_grads=config.balancer.balance_grads,
+        total_norm=config.balancer.total_norm,
+        ema_decay=config.balancer.ema_decay,
+        per_batch_item=config.balancer.per_batch_item,
+        epsilon=config.balancer.epsilon,
+    )
 
 
 def set_seed(seed: int) -> None:
@@ -327,6 +353,7 @@ def train_codec(
     model = build_codec_model(config).to(resolved_device)
     criterion = build_loss(config).to(resolved_device)
     adversarial_components = build_adversarial_components(config, device=resolved_device)
+    balancer = build_balancer(config)
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=config.optimization.learning_rate,
@@ -337,6 +364,7 @@ def train_codec(
         config.optimization.mixed_precision
         and resolved_device.type == "cuda"
         and adversarial_components is None
+        and balancer is None
     )
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
     train_iterator = cycle_dataloader(train_loader)
@@ -389,6 +417,10 @@ def train_codec(
                 codebook_loss=output.codebook_loss.float(),
             )
             objective_total_loss = losses["total_loss"]
+            quantizer_total_loss = (
+                config.quantizer.commitment_weight * losses["commitment_loss"]
+                + config.quantizer.codebook_weight * losses["codebook_loss"]
+            )
 
             discriminator_loss: torch.Tensor | None = None
             generator_adv_loss_value: torch.Tensor | None = None
@@ -426,6 +458,29 @@ def train_codec(
                     real_feature_maps=real_feature_maps,
                 )
                 _set_requires_grad(discriminator, True)
+
+            balanced_losses: dict[str, torch.Tensor] = {}
+            if balancer is not None:
+                if config.loss.waveform_weight > 0:
+                    balanced_losses["waveform_loss"] = losses["waveform_loss"]
+                if config.loss.stft_weight > 0:
+                    balanced_losses["stft_loss"] = losses["stft_loss"]
+                if config.loss.mel_weight > 0:
+                    balanced_losses["mel_loss"] = losses["mel_loss"]
+                if generator_adv_loss_value is not None and config.adversarial.adversarial_weight > 0:
+                    balanced_losses["generator_adversarial_loss"] = generator_adv_loss_value
+                if feature_matching_loss_value is not None and config.adversarial.feature_matching_weight > 0:
+                    balanced_losses["feature_matching_loss"] = feature_matching_loss_value
+
+            if balancer is not None:
+                if quantizer_total_loss.requires_grad:
+                    quantizer_total_loss.backward(retain_graph=True)
+                balanced_total_loss = balancer.backward(
+                    losses=balanced_losses,
+                    input_tensor=output.reconstruction.float(),
+                )
+                total_loss = balanced_total_loss + quantizer_total_loss.detach()
+            elif adversarial_components is not None:
                 total_loss = (
                     objective_total_loss
                     + config.adversarial.adversarial_weight * generator_adv_loss_value
@@ -449,7 +504,8 @@ def train_codec(
                 scaler.step(optimizer)
                 scaler.update()
             else:
-                total_loss.backward()
+                if balancer is None:
+                    total_loss.backward()
                 optimizer.step()
 
             step_metrics = {name: float(value.item()) for name, value in losses.items()}
@@ -460,6 +516,8 @@ def train_codec(
                 step_metrics["generator_adversarial_loss"] = float(generator_adv_loss_value.item())
             if feature_matching_loss_value is not None:
                 step_metrics["feature_matching_loss"] = float(feature_matching_loss_value.item())
+            if balancer is not None:
+                step_metrics.update(balancer.metrics)
             step_metrics["step_time_seconds"] = time.perf_counter() - started_at
 
             if step == 1 or step % config.optimization.log_interval == 0:
