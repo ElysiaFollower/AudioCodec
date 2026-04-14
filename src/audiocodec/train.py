@@ -13,6 +13,12 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
+from audiocodec.adversarial import (
+    FeatureMatchingLoss,
+    MultiScaleSTFTDiscriminator,
+    discriminator_adversarial_loss,
+    generator_adversarial_loss,
+)
 from audiocodec.config import CodecExperimentConfig
 from audiocodec.data.librispeech import (
     SpeechSegmentDataset,
@@ -35,6 +41,13 @@ class TrainingArtifacts:
     resolved_config_path: Path
     metrics_path: Path
     tensorboard_dir: Path | None = None
+
+
+@dataclass(slots=True)
+class AdversarialComponents:
+    discriminator: MultiScaleSTFTDiscriminator
+    optimizer: torch.optim.Optimizer
+    feature_matching_loss: FeatureMatchingLoss
 
 
 def set_seed(seed: int) -> None:
@@ -135,6 +148,33 @@ def build_loss(config: CodecExperimentConfig) -> CodecLoss:
     )
 
 
+def build_adversarial_components(
+    config: CodecExperimentConfig,
+    device: torch.device,
+) -> AdversarialComponents | None:
+    if not config.adversarial.enabled:
+        return None
+
+    discriminator = MultiScaleSTFTDiscriminator(
+        filters=config.adversarial.discriminator_filters,
+        in_channels=config.audio.channels,
+        n_ffts=config.adversarial.n_ffts,
+        hop_lengths=config.adversarial.hop_lengths,
+        win_lengths=config.adversarial.win_lengths,
+    ).to(device)
+    optimizer = torch.optim.Adam(
+        discriminator.parameters(),
+        lr=config.adversarial.discriminator_learning_rate,
+        betas=config.adversarial.discriminator_betas,
+        weight_decay=config.adversarial.discriminator_weight_decay,
+    )
+    return AdversarialComponents(
+        discriminator=discriminator,
+        optimizer=optimizer,
+        feature_matching_loss=FeatureMatchingLoss(),
+    )
+
+
 def append_metrics(metrics_path: Path, payload: dict) -> None:
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
     with metrics_path.open("a") as handle:
@@ -165,18 +205,22 @@ def save_checkpoint(
     step: int,
     config: CodecExperimentConfig,
     metrics: dict[str, float],
+    discriminator: nn.Module | None = None,
+    discriminator_optimizer: torch.optim.Optimizer | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "step": step,
-            "config": config.to_dict(),
-            "metrics": metrics,
-        },
-        path,
-    )
+    payload = {
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "step": step,
+        "config": config.to_dict(),
+        "metrics": metrics,
+    }
+    if discriminator is not None:
+        payload["discriminator"] = discriminator.state_dict()
+    if discriminator_optimizer is not None:
+        payload["discriminator_optimizer"] = discriminator_optimizer.state_dict()
+    torch.save(payload, path)
 
 
 def save_reconstruction_examples(
@@ -248,6 +292,11 @@ def _ensure_finite_metrics(metrics: dict[str, torch.Tensor] | dict[str, float], 
             raise FloatingPointError(f"Non-finite {split} metric `{name}` detected at step {step}.")
 
 
+def _set_requires_grad(module: nn.Module, requires_grad: bool) -> None:
+    for parameter in module.parameters():
+        parameter.requires_grad_(requires_grad)
+
+
 def train_codec(
     config: CodecExperimentConfig,
     output_dir: str | Path,
@@ -277,13 +326,18 @@ def train_codec(
 
     model = build_codec_model(config).to(resolved_device)
     criterion = build_loss(config).to(resolved_device)
+    adversarial_components = build_adversarial_components(config, device=resolved_device)
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=config.optimization.learning_rate,
         weight_decay=config.optimization.weight_decay,
     )
 
-    amp_enabled = config.optimization.mixed_precision and resolved_device.type == "cuda"
+    amp_enabled = (
+        config.optimization.mixed_precision
+        and resolved_device.type == "cuda"
+        and adversarial_components is None
+    )
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
     train_iterator = cycle_dataloader(train_loader)
     writer = create_tensorboard_writer(output_path, enabled=tensorboard)
@@ -300,6 +354,8 @@ def train_codec(
                 "random_crop": False,
             }
         )
+    resolved_payload.setdefault("runtime", {})
+    resolved_payload["runtime"]["amp_enabled"] = amp_enabled
     resolved_config_path.write_text(json.dumps(resolved_payload, indent=2))
     if writer is not None:
         writer.add_text("config/json", json.dumps(resolved_payload, indent=2))
@@ -313,6 +369,8 @@ def train_codec(
         for step in range(1, total_steps + 1):
             started_at = time.perf_counter()
             model.train()
+            if adversarial_components is not None:
+                adversarial_components.discriminator.train()
             batch = next(train_iterator).to(resolved_device)
 
             optimizer.zero_grad(set_to_none=True)
@@ -330,8 +388,61 @@ def train_codec(
                 commitment_loss=output.commitment_loss.float(),
                 codebook_loss=output.codebook_loss.float(),
             )
-            total_loss = losses["total_loss"]
-            _ensure_finite_metrics(losses, split="train", step=step)
+            objective_total_loss = losses["total_loss"]
+
+            discriminator_loss: torch.Tensor | None = None
+            generator_adv_loss_value: torch.Tensor | None = None
+            feature_matching_loss_value: torch.Tensor | None = None
+
+            if adversarial_components is not None:
+                discriminator = adversarial_components.discriminator
+
+                adversarial_components.optimizer.zero_grad(set_to_none=True)
+                fake_logits_for_d, _ = discriminator(output.reconstruction.detach().float())
+                real_logits_for_d, _ = discriminator(batch.float())
+                discriminator_loss = discriminator_adversarial_loss(
+                    fake_logits=fake_logits_for_d,
+                    real_logits=real_logits_for_d,
+                    loss_type=config.adversarial.loss_type,
+                )
+                _ensure_finite_metrics(
+                    {"discriminator_loss": discriminator_loss},
+                    split="train",
+                    step=step,
+                )
+                discriminator_loss.backward()
+                adversarial_components.optimizer.step()
+
+                _set_requires_grad(discriminator, False)
+                fake_logits_for_g, fake_feature_maps = discriminator(output.reconstruction.float())
+                with torch.no_grad():
+                    _, real_feature_maps = discriminator(batch.float())
+                generator_adv_loss_value = generator_adversarial_loss(
+                    fake_logits=fake_logits_for_g,
+                    loss_type=config.adversarial.loss_type,
+                )
+                feature_matching_loss_value = adversarial_components.feature_matching_loss(
+                    fake_feature_maps=fake_feature_maps,
+                    real_feature_maps=real_feature_maps,
+                )
+                _set_requires_grad(discriminator, True)
+                total_loss = (
+                    objective_total_loss
+                    + config.adversarial.adversarial_weight * generator_adv_loss_value
+                    + config.adversarial.feature_matching_weight * feature_matching_loss_value
+                )
+            else:
+                total_loss = objective_total_loss
+
+            finite_metrics: dict[str, torch.Tensor] = dict(losses)
+            finite_metrics["generator_total_loss"] = total_loss
+            if discriminator_loss is not None:
+                finite_metrics["discriminator_loss"] = discriminator_loss
+            if generator_adv_loss_value is not None:
+                finite_metrics["generator_adversarial_loss"] = generator_adv_loss_value
+            if feature_matching_loss_value is not None:
+                finite_metrics["feature_matching_loss"] = feature_matching_loss_value
+            _ensure_finite_metrics(finite_metrics, split="train", step=step)
 
             if amp_enabled:
                 scaler.scale(total_loss).backward()
@@ -342,6 +453,13 @@ def train_codec(
                 optimizer.step()
 
             step_metrics = {name: float(value.item()) for name, value in losses.items()}
+            step_metrics["generator_total_loss"] = float(total_loss.item())
+            if discriminator_loss is not None:
+                step_metrics["discriminator_loss"] = float(discriminator_loss.item())
+            if generator_adv_loss_value is not None:
+                step_metrics["generator_adversarial_loss"] = float(generator_adv_loss_value.item())
+            if feature_matching_loss_value is not None:
+                step_metrics["feature_matching_loss"] = float(feature_matching_loss_value.item())
             step_metrics["step_time_seconds"] = time.perf_counter() - started_at
 
             if step == 1 or step % config.optimization.log_interval == 0:
@@ -349,10 +467,17 @@ def train_codec(
                 if writer is not None:
                     for name, value in step_metrics.items():
                         writer.add_scalar(f"train/{name}", value, global_step=step)
-                print(
-                    f"[train] step={step} total={step_metrics['total_loss']:.4f} "
+                message = (
+                    f"[train] step={step} total={step_metrics['generator_total_loss']:.4f} "
                     f"waveform={step_metrics['waveform_loss']:.4f} stft={step_metrics['stft_loss']:.4f}"
                 )
+                if "generator_adversarial_loss" in step_metrics:
+                    message += (
+                        f" adv={step_metrics['generator_adversarial_loss']:.4f}"
+                        f" feat={step_metrics['feature_matching_loss']:.4f}"
+                        f" d={step_metrics['discriminator_loss']:.4f}"
+                    )
+                print(message)
 
             should_evaluate = (
                 step == total_steps
@@ -395,6 +520,12 @@ def train_codec(
                     step=step,
                     config=config,
                     metrics=val_metrics,
+                    discriminator=(
+                        adversarial_components.discriminator if adversarial_components is not None else None
+                    ),
+                    discriminator_optimizer=(
+                        adversarial_components.optimizer if adversarial_components is not None else None
+                    ),
                 )
 
                 if val_metrics["total_loss"] < best_val_loss:
@@ -406,6 +537,12 @@ def train_codec(
                         step=step,
                         config=config,
                         metrics=val_metrics,
+                        discriminator=(
+                            adversarial_components.discriminator if adversarial_components is not None else None
+                        ),
+                        discriminator_optimizer=(
+                            adversarial_components.optimizer if adversarial_components is not None else None
+                        ),
                     )
                 model.train()
     finally:
