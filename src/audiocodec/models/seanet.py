@@ -136,6 +136,7 @@ class SEANetResidualBlock(nn.Module):
         dilation: int,
         kernel_size: int,
         compress: int,
+        true_skip: bool,
     ) -> None:
         super().__init__()
         hidden_channels = max(1, channels // compress)
@@ -151,9 +152,12 @@ class SEANetResidualBlock(nn.Module):
             _make_activation(),
             SConv1d(hidden_channels, channels, kernel_size=1, norm=norm),
         )
+        self.shortcut: nn.Module = nn.Identity() if true_skip else SConv1d(
+            channels, channels, kernel_size=1, norm=norm
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return x + self.block(x)
+        return self.shortcut(x) + self.block(x)
 
 
 def _make_activation() -> nn.ELU:
@@ -177,6 +181,7 @@ class SEANetEncoder(nn.Module):
         kernel_size: int,
         last_kernel_size: int,
         norm: str,
+        true_skip: bool,
     ) -> None:
         super().__init__()
         self.channels = channels
@@ -196,6 +201,7 @@ class SEANetEncoder(nn.Module):
                         dilation=dilation_base**residual_layer,
                         kernel_size=residual_kernel_size,
                         compress=compress,
+                        true_skip=true_skip,
                     )
                 )
             layers.extend(
@@ -244,6 +250,7 @@ class SEANetDecoder(nn.Module):
         kernel_size: int,
         last_kernel_size: int,
         norm: str,
+        true_skip: bool,
     ) -> None:
         super().__init__()
         self.channels = channels
@@ -279,6 +286,7 @@ class SEANetDecoder(nn.Module):
                         dilation=dilation_base**residual_layer,
                         kernel_size=residual_kernel_size,
                         compress=compress,
+                        true_skip=true_skip,
                     )
                 )
             current_channels = next_channels

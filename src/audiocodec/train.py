@@ -86,14 +86,14 @@ def build_dataloaders(
         examples=train_examples,
         sample_rate=config.audio.sample_rate,
         channels=config.audio.channels,
-        clip_seconds=None if overfit_mode else config.audio.train_clip_seconds,
+        clip_seconds=config.audio.train_clip_seconds,
         random_crop=not overfit_mode,
     )
     val_dataset = SpeechSegmentDataset(
         examples=train_examples if overfit_mode else splits.val,
         sample_rate=config.audio.sample_rate,
         channels=config.audio.channels,
-        clip_seconds=None if overfit_mode else config.audio.eval_clip_seconds,
+        clip_seconds=config.audio.eval_clip_seconds,
         random_crop=False,
     )
 
@@ -202,6 +202,7 @@ def evaluate(
     dataloader: DataLoader,
     device: torch.device,
     max_batches: int,
+    amp_enabled: bool,
 ) -> tuple[dict[str, float], tuple[torch.Tensor, torch.Tensor] | None]:
     model.eval()
 
@@ -210,12 +211,18 @@ def evaluate(
     preview: tuple[torch.Tensor, torch.Tensor] | None = None
     for batch in dataloader:
         batch = batch.to(device)
-        output = model(batch)
+        autocast_context = (
+            torch.autocast(device_type="cuda", dtype=torch.float16)
+            if amp_enabled
+            else nullcontext()
+        )
+        with autocast_context:
+            output = model(batch)
         losses = criterion(
-            reconstruction=output.reconstruction,
-            target=batch,
-            commitment_loss=output.commitment_loss,
-            codebook_loss=output.codebook_loss,
+            reconstruction=output.reconstruction.float(),
+            target=batch.float(),
+            commitment_loss=output.commitment_loss.float(),
+            codebook_loss=output.codebook_loss.float(),
         )
         for name, value in losses.items():
             totals[name] = totals.get(name, 0.0) + float(value.item())
@@ -244,6 +251,12 @@ def train_codec(
 ) -> TrainingArtifacts:
     output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
+    metrics_path = output_path / "metrics.jsonl"
+    if metrics_path.exists():
+        raise FileExistsError(
+            f"Output directory {output_path} already contains metrics.jsonl. "
+            "Use a fresh --output-dir because resume/mixed-run logging is not supported."
+        )
 
     set_seed(config.optimization.seed)
     resolved_device = resolve_device(device)
@@ -267,10 +280,20 @@ def train_codec(
     writer = create_tensorboard_writer(output_path, enabled=tensorboard)
 
     resolved_config_path = output_path / "resolved_config.json"
-    metrics_path = output_path / "metrics.jsonl"
-    resolved_config_path.write_text(json.dumps(config.to_dict(), indent=2))
+    resolved_payload = config.to_dict()
+    if overfit_example_path is not None:
+        resolved_payload.setdefault("debug", {})
+        resolved_payload["debug"].update(
+            {
+                "overfit_example_path": str(Path(overfit_example_path).expanduser().resolve()),
+                "effective_batch_size": 1,
+                "effective_num_workers": 0,
+                "random_crop": False,
+            }
+        )
+    resolved_config_path.write_text(json.dumps(resolved_payload, indent=2))
     if writer is not None:
-        writer.add_text("config/json", json.dumps(config.to_dict(), indent=2))
+        writer.add_text("config/json", json.dumps(resolved_payload, indent=2))
 
     total_steps = steps
     if total_steps is None:
@@ -333,6 +356,7 @@ def train_codec(
                     dataloader=val_loader,
                     device=resolved_device,
                     max_batches=config.optimization.max_eval_batches,
+                    amp_enabled=amp_enabled,
                 )
                 append_metrics(metrics_path, {"split": "val", "step": step, **val_metrics})
                 if writer is not None:

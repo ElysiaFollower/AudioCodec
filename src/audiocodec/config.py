@@ -50,6 +50,7 @@ class ModelConfig:
     seanet_kernel_size: int = 7
     seanet_last_kernel_size: int = 7
     seanet_norm: str = "weight_norm"
+    seanet_true_skip: bool = False
 
     def __post_init__(self) -> None:
         self.channel_multipliers = tuple(self.channel_multipliers)

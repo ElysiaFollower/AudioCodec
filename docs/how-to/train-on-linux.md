@@ -83,8 +83,9 @@ tail -f "$LOG"
 
 - 只使用一条指定音频
 - 训练和验证都复用同一条样本
-- 关闭随机裁剪，直接对整条音频做重建
+- 固定取同一个前段 clip，而不是随机裁剪
 - 把 batch size 固定成 `1`
+- 保持与正常训练相同的 clip 时长配置，便于做实现验机
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
@@ -102,6 +103,11 @@ CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
 - 如果它能较好地记住这一条样本，但正常训练质量仍差，问题更可能在架构容量、码率预算或训练目标设计。
 
 这不是绝对定理。对于带离散瓶颈的 codec，“不能完美重建”不一定百分之百说明代码错了，因为瓶颈预算、本身损失设计和优化设置也会限制上界。但如果连单条样本都明显学不住，通常应该先查实现，而不是先怪架构。
+
+注意：
+
+- 请为每次 overfit 调试使用新的 `--output-dir`
+- 当前训练脚本不支持 resume，同一个输出目录重复运行会直接报错，避免混合旧日志和新结果
 
 ### 2. Baseline main run
 

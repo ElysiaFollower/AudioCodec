@@ -163,6 +163,9 @@ class BaseCodecModel(nn.Module):
         if waveform.shape[1] != self.channels:
             raise ValueError("waveform channel count does not match the model configuration.")
 
+        if self.model_config.architecture == "seanet":
+            return waveform, 0
+
         original_length = waveform.shape[-1]
         remainder = original_length % self.hop_length
         if remainder == 0:
@@ -174,10 +177,11 @@ class BaseCodecModel(nn.Module):
         padded_waveform, pad_amount = self._pad_waveform(waveform)
         latent = self.encoder(padded_waveform)
         codes = self.quantizer.encode(latent)
+        padded_length = latent.shape[-1] * self.hop_length
         return EncodedAudio(
             codes=codes,
             original_length=waveform.shape[-1],
-            padded_length=waveform.shape[-1] + pad_amount,
+            padded_length=padded_length,
         )
 
     def decode(self, codes: torch.Tensor, length: int | None = None) -> torch.Tensor:
@@ -192,8 +196,10 @@ class BaseCodecModel(nn.Module):
         latent = self.encoder(padded_waveform)
         rvq_output: RVQOutput = self.quantizer(latent)
         reconstruction = self.decoder(rvq_output.quantized)
-        if pad_amount:
+        padded_length = latent.shape[-1] * self.hop_length
+        if pad_amount and self.model_config.architecture != "seanet":
             reconstruction = reconstruction[..., :-pad_amount]
+        reconstruction = reconstruction[..., : waveform.shape[-1]]
         return CodecOutput(
             reconstruction=reconstruction,
             codes=rvq_output.codes,
@@ -202,7 +208,7 @@ class BaseCodecModel(nn.Module):
             commitment_loss=rvq_output.commitment_loss,
             codebook_loss=rvq_output.codebook_loss,
             original_length=waveform.shape[-1],
-            padded_length=padded_waveform.shape[-1],
+            padded_length=padded_length,
         )
 
 
@@ -250,6 +256,7 @@ class SEANetRVQCodec(BaseCodecModel):
             kernel_size=model_config.seanet_kernel_size,
             last_kernel_size=model_config.seanet_last_kernel_size,
             norm=model_config.seanet_norm,
+            true_skip=model_config.seanet_true_skip,
         )
         decoder = SEANetDecoder(
             channels=channels,
@@ -264,6 +271,7 @@ class SEANetRVQCodec(BaseCodecModel):
             kernel_size=model_config.seanet_kernel_size,
             last_kernel_size=model_config.seanet_last_kernel_size,
             norm=model_config.seanet_norm,
+            true_skip=model_config.seanet_true_skip,
         )
         quantizer = EMAResidualVectorQuantizer(
             dimension=model_config.latent_dim,

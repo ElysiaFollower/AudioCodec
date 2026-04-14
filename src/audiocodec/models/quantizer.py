@@ -199,8 +199,6 @@ class EMACodebook(nn.Module):
             return
         replacements = _sample_vectors(flat_inputs, int(dead_mask.sum().item())).to(self.embedding.dtype)
         self.embedding[dead_mask] = replacements
-        self.embedding_avg[dead_mask] = replacements
-        self.cluster_size[dead_mask] = float(self.dead_code_threshold)
 
     @torch.no_grad()
     def _ema_update(self, flat_inputs: torch.Tensor, indices: torch.Tensor) -> None:
@@ -210,8 +208,6 @@ class EMACodebook(nn.Module):
 
         self.cluster_size.mul_(self.decay).add_(cluster_size, alpha=1.0 - self.decay)
         self.embedding_avg.mul_(self.decay).add_(embedding_sum, alpha=1.0 - self.decay)
-
-        self._replace_dead_codes(flat_inputs)
 
         smoothed_cluster_size = (self.cluster_size + 1e-5) / (
             self.cluster_size.sum() + self.size * 1e-5
@@ -229,18 +225,19 @@ class EMACodebook(nn.Module):
         input_dtype = inputs.dtype
         batch_size, channels, frames = inputs.shape
         flat_inputs = inputs.transpose(1, 2).reshape(-1, channels).to(self.embedding.dtype)
-        if self.training:
-            self._maybe_initialize(flat_inputs)
+        self._maybe_initialize(flat_inputs)
 
         flat_indices = self._compute_indices(flat_inputs)
-        quantized = self._lookup(flat_indices).view(batch_size, frames, channels).transpose(1, 2)
+        quantized = self._lookup(flat_indices)
 
         if self.training:
+            self._replace_dead_codes(flat_inputs)
             self._ema_update(flat_inputs, flat_indices)
 
-        commitment_loss = F.mse_loss(inputs.float(), quantized.detach().float())
-        quantized = quantized.to(input_dtype)
-        quantized = inputs + (quantized - inputs).detach()
+        commitment_loss = F.mse_loss(flat_inputs.float(), quantized.detach().float())
+        if self.training:
+            quantized = flat_inputs + (quantized - flat_inputs).detach()
+        quantized = quantized.view(batch_size, frames, channels).transpose(1, 2).to(input_dtype)
         return quantized, flat_indices.view(batch_size, frames), commitment_loss
 
     @torch.no_grad()
@@ -296,12 +293,12 @@ class EMAResidualVectorQuantizer(nn.Module):
         for codebook in self.codebooks:
             stage_quantized, stage_codes, stage_commitment = codebook(residual)
             quantized_sum = quantized_sum + stage_quantized
-            residual = residual - stage_quantized.detach()
+            residual = residual - stage_quantized
             commitment_loss = commitment_loss + stage_commitment
             codes.append(stage_codes)
 
         return RVQOutput(
-            quantized=latents + (quantized_sum - latents).detach(),
+            quantized=quantized_sum,
             codes=torch.stack(codes, dim=1),
             commitment_loss=commitment_loss / self.num_quantizers,
             codebook_loss=latents.new_zeros(()),
