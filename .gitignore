@@ -7,12 +7,14 @@ __pycache__/
 .coverage
 .venv/
 venv/
+.vscode/
 
 /artifacts/
 /checkpoints/
 /data/
 /outputs/
 /runs/
+tmp/
 
 *.egg-info/
 

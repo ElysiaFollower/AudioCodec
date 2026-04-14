@@ -29,6 +29,14 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.quantizer.num_quantizers, 24)
         self.assertFalse(config.optimization.mixed_precision)
 
+    def test_encodec_like_loss_ablation_matches_reference_direction(self) -> None:
+        config = load_experiment_config(Path("configs/ablation-encodec-like-loss.json"))
+        self.assertEqual(config.model.architecture, "seanet")
+        self.assertEqual(config.loss.waveform_weight, 0.1)
+        self.assertEqual(config.loss.stft_weight, 2.0)
+        self.assertEqual(config.loss.mel_weight, 0.0)
+        self.assertFalse(config.optimization.mixed_precision)
+
 
 if __name__ == "__main__":
     unittest.main()
