@@ -26,16 +26,15 @@ Last reviewed: 2026-04-14
 1. 修改 `configs/*.json` 中的 `dataset.root`
 2. 运行训练命令时传 `--dataset-root`
 
-推荐优先使用运行时参数，避免把机器相关路径写回仓库。
+当前仓库中的默认配置已经对齐到训练机上的 `train.100` 路径，因此命令模板默认不再显式传 `--dataset-root`。如果后续换机器或换数据目录，再用运行时参数覆盖即可。
 
 ## 推荐训练顺序
 
 ### 1. Baseline smoke test
 
 ```bash
-PYTHONPATH=src python scripts/train_codec.py \
+CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
   --config configs/baseline.json \
-  --dataset-root /path/to/LibriSpeech/dev-clean \
   --output-dir artifacts/linux-baseline-smoke \
   --smoke-test \
   --limit-train-examples 10 \
@@ -51,9 +50,8 @@ PYTHONPATH=src python scripts/train_codec.py \
 ### 2. Baseline main run
 
 ```bash
-PYTHONPATH=src python scripts/train_codec.py \
+CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
   --config configs/baseline.json \
-  --dataset-root /path/to/LibriSpeech/dev-clean \
   --output-dir artifacts/linux-baseline-main \
   --device cuda \
   --tensorboard
@@ -62,9 +60,8 @@ PYTHONPATH=src python scripts/train_codec.py \
 ### 3. Mel loss ablation
 
 ```bash
-PYTHONPATH=src python scripts/train_codec.py \
+CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
   --config configs/ablation-mel-loss.json \
-  --dataset-root /path/to/LibriSpeech/dev-clean \
   --output-dir artifacts/linux-mel-ablation \
   --device cuda \
   --tensorboard
@@ -75,9 +72,8 @@ PYTHONPATH=src python scripts/train_codec.py \
 当 baseline 的试听结果不足以达到“可用”级别时，优先切换到这一路线：
 
 ```bash
-PYTHONPATH=src python scripts/train_codec.py \
+CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
   --config configs/encodec-inspired.json \
-  --dataset-root /path/to/LibriSpeech/dev-clean \
   --output-dir artifacts/linux-encodec-inspired \
   --device cuda \
   --tensorboard

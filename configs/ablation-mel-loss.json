@@ -1,6 +1,6 @@
 {
   "dataset": {
-    "root": "/path/to/LibriSpeech/dev-clean",
+    "root": "/home/lujingyu/lujingyu_data/data/AUDIO_DATA/librispeech_asr/clean/train.100",
     "train_minutes": 60,
     "val_minutes": 10,
     "test_minutes": 10
@@ -48,7 +48,7 @@
     "eval_interval": 500,
     "checkpoint_interval": 500,
     "log_interval": 50,
-    "num_workers": 0,
+    "num_workers": 8,
     "max_eval_batches": 8,
     "seed": 1337
   }

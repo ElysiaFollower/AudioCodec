@@ -15,3 +15,5 @@ venv/
 /runs/
 
 *.egg-info/
+
+logs/

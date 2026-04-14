@@ -1,6 +1,6 @@
 {
   "dataset": {
-    "root": "/path/to/LibriSpeech/dev-clean",
+    "root": "/home/lujingyu/lujingyu_data/data/AUDIO_DATA/librispeech_asr/clean/train.100",
     "train_minutes": 60,
     "val_minutes": 10,
     "test_minutes": 10

@@ -9,7 +9,10 @@ from audiocodec.config import load_experiment_config
 class ConfigTests(unittest.TestCase):
     def test_baseline_config_exposes_dataset_root(self) -> None:
         config = load_experiment_config(Path("configs/baseline.json"))
-        self.assertEqual(config.dataset.root, "/path/to/LibriSpeech/dev-clean")
+        self.assertEqual(
+            config.dataset.root,
+            "/home/lujingyu/lujingyu_data/data/AUDIO_DATA/librispeech_asr/clean/train.100",
+        )
         self.assertEqual(config.frame_rate, 100)
         self.assertEqual(config.model.architecture, "conv")
 
