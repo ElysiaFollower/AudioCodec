@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import random
 import time
+from typing import Any
 
 import torch
 from torch import nn
@@ -226,6 +227,11 @@ def append_metrics(metrics_path: Path, payload: dict) -> None:
         handle.write(json.dumps(payload) + "\n")
 
 
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2))
+
+
 def _read_logged_steps(metrics_path: Path) -> tuple[int | None, float | None]:
     if not metrics_path.exists():
         return None, None
@@ -246,6 +252,69 @@ def _read_logged_steps(metrics_path: Path) -> tuple[int | None, float | None]:
                     if best_val_loss is None or float(val_loss) < best_val_loss:
                         best_val_loss = float(val_loss)
     return last_logged_step, best_val_loss
+
+
+def _flatten_config(payload: dict[str, Any], prefix: str = "") -> dict[str, Any]:
+    flattened: dict[str, Any] = {}
+    for key, value in payload.items():
+        path = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            flattened.update(_flatten_config(value, prefix=path))
+        else:
+            flattened[path] = value
+    return flattened
+
+
+def _assert_resume_config_matches(current_config: dict[str, Any], checkpoint_config: dict[str, Any]) -> None:
+    current = _flatten_config(current_config)
+    previous = _flatten_config(checkpoint_config)
+    differences: list[str] = []
+    for key in sorted(set(current) | set(previous)):
+        if current.get(key) != previous.get(key):
+            differences.append(f"{key}: checkpoint={previous.get(key)!r}, current={current.get(key)!r}")
+    if differences:
+        summary = "\n".join(differences[:10])
+        if len(differences) > 10:
+            summary += f"\n... and {len(differences) - 10} more differences"
+        raise ValueError(
+            "Resume config does not match the checkpoint config.\n"
+            f"{summary}"
+        )
+
+
+def _capture_rng_state() -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "python_random_state": random.getstate(),
+        "torch_rng_state": torch.get_rng_state(),
+    }
+    if torch.cuda.is_available():
+        payload["torch_cuda_rng_state_all"] = torch.cuda.get_rng_state_all()
+    return payload
+
+
+def _restore_rng_state(state: dict[str, Any]) -> None:
+    python_state = state.get("python_random_state")
+    torch_state = state.get("torch_rng_state")
+    if python_state is not None:
+        random.setstate(python_state)
+    if torch_state is not None:
+        torch.set_rng_state(torch_state)
+    cuda_states = state.get("torch_cuda_rng_state_all")
+    if cuda_states is not None and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(cuda_states)
+
+
+def _resume_limitations(config: CodecExperimentConfig, overfit_example_path: str | None) -> list[str]:
+    limitations: list[str] = []
+    if config.optimization.num_workers > 0 and overfit_example_path is None:
+        limitations.append(
+            "num_workers > 0 means dataloader worker progress is not checkpointed; resumed runs are warm continuations, not exact sample-order continuations."
+        )
+    if config.audio.train_clip_seconds is not None and overfit_example_path is None:
+        limitations.append(
+            "random crop offsets and sampler progress are not checkpointed; resumed runs may diverge slightly from uninterrupted training even though model and optimizer states are restored."
+        )
+    return limitations
 
 
 def create_tensorboard_writer(output_dir: Path, enabled: bool):
@@ -274,6 +343,9 @@ def save_checkpoint(
     metrics: dict[str, float],
     discriminator: nn.Module | None = None,
     discriminator_optimizer: torch.optim.Optimizer | None = None,
+    balancer: Balancer | None = None,
+    scaler: torch.amp.GradScaler | None = None,
+    rng_state: dict[str, Any] | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -287,6 +359,12 @@ def save_checkpoint(
         payload["discriminator"] = discriminator.state_dict()
     if discriminator_optimizer is not None:
         payload["discriminator_optimizer"] = discriminator_optimizer.state_dict()
+    if balancer is not None:
+        payload["balancer"] = balancer.state_dict()
+    if scaler is not None:
+        payload["scaler"] = scaler.state_dict()
+    if rng_state is not None:
+        payload["rng_state"] = rng_state
     torch.save(payload, path)
 
 
@@ -382,6 +460,8 @@ def train_codec(
     output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
     metrics_path = output_path / "metrics.jsonl"
+    resolved_config_path = output_path / "resolved_config.json"
+    resume_history_path = output_path / "resume_history.jsonl"
     resume_path = Path(resume_from).expanduser().resolve() if resume_from is not None else None
     if metrics_path.exists() and resume_path is None:
         raise FileExistsError(
@@ -409,6 +489,10 @@ def train_codec(
 
     if resume_path is not None:
         checkpoint = _load_checkpoint(resume_path)
+        checkpoint_config = checkpoint.get("config")
+        if not isinstance(checkpoint_config, dict):
+            raise ValueError(f"Checkpoint {resume_path} does not contain a valid config payload.")
+        _assert_resume_config_matches(config.to_dict(), checkpoint_config)
         model.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         start_step = int(checkpoint["step"]) + 1
@@ -425,6 +509,18 @@ def train_codec(
             raise ValueError(
                 f"Checkpoint {resume_path} contains discriminator state, "
                 "but the active config disables adversarial training."
+            )
+        if balancer is not None:
+            if "balancer" not in checkpoint:
+                raise ValueError(
+                    f"Checkpoint {resume_path} does not contain balancer state, "
+                    "but the active config enables the balancer."
+                )
+            balancer.load_state_dict(checkpoint["balancer"])
+        elif "balancer" in checkpoint:
+            raise ValueError(
+                f"Checkpoint {resume_path} contains balancer state, "
+                "but the active config disables the balancer."
             )
 
         if last_logged_step is not None and start_step <= last_logged_step:
@@ -443,10 +539,14 @@ def train_codec(
         and balancer is None
     )
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
+    if resume_path is not None:
+        checkpoint = _load_checkpoint(resume_path)
+        if "scaler" in checkpoint:
+            scaler.load_state_dict(checkpoint["scaler"])
+        if "rng_state" in checkpoint:
+            _restore_rng_state(checkpoint["rng_state"])
     train_iterator = cycle_dataloader(train_loader)
     writer = create_tensorboard_writer(output_path, enabled=tensorboard)
-
-    resolved_config_path = output_path / "resolved_config.json"
     resolved_payload = config.to_dict()
     if overfit_example_path is not None:
         resolved_payload.setdefault("debug", {})
@@ -460,10 +560,30 @@ def train_codec(
         )
     resolved_payload.setdefault("runtime", {})
     resolved_payload["runtime"]["amp_enabled"] = amp_enabled
+    resolved_payload["runtime"]["resume_limitations"] = _resume_limitations(
+        config=config,
+        overfit_example_path=overfit_example_path,
+    )
     if resume_path is not None:
         resolved_payload["runtime"]["resume_from"] = str(resume_path)
         resolved_payload["runtime"]["resume_start_step"] = start_step
-    resolved_config_path.write_text(json.dumps(resolved_payload, indent=2))
+        append_metrics(
+            resume_history_path,
+            {
+                "timestamp_unix": time.time(),
+                "resume_from": str(resume_path),
+                "resume_start_step": start_step,
+                "resume_limitations": resolved_payload["runtime"]["resume_limitations"],
+            },
+        )
+        if not resolved_config_path.exists():
+            _write_json(resolved_config_path, resolved_payload)
+        _write_json(output_path / "resume_session.json", resolved_payload)
+        print(f"[resume] continuing from {resume_path} at step {start_step}")
+        for limitation in resolved_payload["runtime"]["resume_limitations"]:
+            print(f"[resume] warning: {limitation}")
+    else:
+        _write_json(resolved_config_path, resolved_payload)
     if writer is not None:
         writer.add_text("config/json", json.dumps(resolved_payload, indent=2))
 
@@ -666,6 +786,9 @@ def train_codec(
                     discriminator_optimizer=(
                         adversarial_components.optimizer if adversarial_components is not None else None
                     ),
+                    balancer=balancer,
+                    scaler=scaler,
+                    rng_state=_capture_rng_state(),
                 )
 
                 if val_metrics["total_loss"] < best_val_loss:
@@ -683,6 +806,9 @@ def train_codec(
                         discriminator_optimizer=(
                             adversarial_components.optimizer if adversarial_components is not None else None
                         ),
+                        balancer=balancer,
+                        scaler=scaler,
+                        rng_state=_capture_rng_state(),
                     )
                 model.train()
     finally:

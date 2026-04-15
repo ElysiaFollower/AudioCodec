@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from audiocodec.train import _read_logged_steps
+from audiocodec.train import _assert_resume_config_matches, _read_logged_steps
 
 
 class TrainingUtilityTests(unittest.TestCase):
@@ -26,6 +26,13 @@ class TrainingUtilityTests(unittest.TestCase):
 
             self.assertEqual(last_step, 2000)
             self.assertEqual(best_val_loss, 1.5)
+
+    def test_resume_config_mismatch_raises(self) -> None:
+        current = {"model": {"architecture": "seanet"}, "optimization": {"batch_size": 8}}
+        checkpoint = {"model": {"architecture": "conv"}, "optimization": {"batch_size": 8}}
+
+        with self.assertRaises(ValueError):
+            _assert_resume_config_matches(current, checkpoint)
 
 
 if __name__ == "__main__":

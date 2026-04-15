@@ -31,6 +31,16 @@ class Balancer:
         self._ema_norms: dict[str, torch.Tensor] = {}
         self.metrics: dict[str, float] = {}
 
+    def state_dict(self) -> dict:
+        return {
+            "ema_norms": {name: value.clone() for name, value in self._ema_norms.items()},
+        }
+
+    def load_state_dict(self, state_dict: dict) -> None:
+        ema_norms = state_dict.get("ema_norms", {})
+        self._ema_norms = {name: value.clone() for name, value in ema_norms.items()}
+        self.metrics = {}
+
     def backward(self, losses: dict[str, torch.Tensor], input_tensor: torch.Tensor) -> torch.Tensor:
         if not losses:
             raise ValueError("losses must not be empty.")
