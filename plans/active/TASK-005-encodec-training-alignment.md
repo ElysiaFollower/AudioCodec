@@ -127,6 +127,18 @@ CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
   --tensorboard
 ```
 
+从已有 checkpoint 继续训练到更大总步数：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_codec.py \
+  --config configs/ablation-adversarial-msstft-balanced.json \
+  --output-dir artifacts/linux-adversarial-msstft-balanced \
+  --resume-from artifacts/linux-adversarial-msstft-balanced/checkpoints/step-020000.pt \
+  --steps 50000 \
+  --device cuda \
+  --tensorboard
+```
+
 ## Immediate Next Step
 
-先用 `ablation-adversarial-msstft-balanced` 路线做一次单样本 overfit 和一次小规模全数据训练，检查是否能避免当前未平衡 adversarial 训练中的静音塌缩。
+先用 `ablation-adversarial-msstft-balanced` 路线继续训练到 `50000` 总步数，验证当前全数据结果是否主要受限于训练预算而不是训练稳定性。

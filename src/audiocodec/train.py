@@ -226,6 +226,28 @@ def append_metrics(metrics_path: Path, payload: dict) -> None:
         handle.write(json.dumps(payload) + "\n")
 
 
+def _read_logged_steps(metrics_path: Path) -> tuple[int | None, float | None]:
+    if not metrics_path.exists():
+        return None, None
+
+    last_logged_step: int | None = None
+    best_val_loss: float | None = None
+    with metrics_path.open() as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            step = payload.get("step")
+            if isinstance(step, int):
+                last_logged_step = step
+            if payload.get("split") == "val":
+                val_loss = payload.get("total_loss")
+                if isinstance(val_loss, (int, float)):
+                    if best_val_loss is None or float(val_loss) < best_val_loss:
+                        best_val_loss = float(val_loss)
+    return last_logged_step, best_val_loss
+
+
 def create_tensorboard_writer(output_dir: Path, enabled: bool):
     if not enabled:
         return None
@@ -342,9 +364,14 @@ def _set_requires_grad(module: nn.Module, requires_grad: bool) -> None:
         parameter.requires_grad_(requires_grad)
 
 
+def _load_checkpoint(path: Path) -> dict:
+    return torch.load(path, map_location="cpu")
+
+
 def train_codec(
     config: CodecExperimentConfig,
     output_dir: str | Path,
+    resume_from: str | Path | None = None,
     steps: int | None = None,
     smoke_test: bool = False,
     limit_train_examples: int | None = None,
@@ -355,7 +382,8 @@ def train_codec(
     output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
     metrics_path = output_path / "metrics.jsonl"
-    if metrics_path.exists():
+    resume_path = Path(resume_from).expanduser().resolve() if resume_from is not None else None
+    if metrics_path.exists() and resume_path is None:
         raise FileExistsError(
             f"Output directory {output_path} already contains metrics.jsonl. "
             "Use a fresh --output-dir because resume/mixed-run logging is not supported."
@@ -374,6 +402,39 @@ def train_codec(
     adversarial_components = build_adversarial_components(config, device=resolved_device)
     balancer = build_balancer(config)
     optimizer = build_generator_optimizer(model=model, config=config)
+    start_step = 1
+    last_logged_step, best_val_loss = _read_logged_steps(metrics_path)
+    if best_val_loss is None:
+        best_val_loss = float("inf")
+
+    if resume_path is not None:
+        checkpoint = _load_checkpoint(resume_path)
+        model.load_state_dict(checkpoint["model"])
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        start_step = int(checkpoint["step"]) + 1
+
+        if adversarial_components is not None:
+            if "discriminator" not in checkpoint or "discriminator_optimizer" not in checkpoint:
+                raise ValueError(
+                    f"Checkpoint {resume_path} does not contain discriminator state, "
+                    "but the active config enables adversarial training."
+                )
+            adversarial_components.discriminator.load_state_dict(checkpoint["discriminator"])
+            adversarial_components.optimizer.load_state_dict(checkpoint["discriminator_optimizer"])
+        elif "discriminator" in checkpoint:
+            raise ValueError(
+                f"Checkpoint {resume_path} contains discriminator state, "
+                "but the active config disables adversarial training."
+            )
+
+        if last_logged_step is not None and start_step <= last_logged_step:
+            raise ValueError(
+                f"Resume step {start_step} from {resume_path} would overlap with existing logs "
+                f"in {metrics_path} (last logged step: {last_logged_step})."
+            )
+        checkpoint_val_loss = checkpoint.get("metrics", {}).get("total_loss")
+        if best_val_loss == float("inf") and isinstance(checkpoint_val_loss, (int, float)):
+            best_val_loss = float(checkpoint_val_loss)
 
     amp_enabled = (
         config.optimization.mixed_precision
@@ -399,6 +460,9 @@ def train_codec(
         )
     resolved_payload.setdefault("runtime", {})
     resolved_payload["runtime"]["amp_enabled"] = amp_enabled
+    if resume_path is not None:
+        resolved_payload["runtime"]["resume_from"] = str(resume_path)
+        resolved_payload["runtime"]["resume_start_step"] = start_step
     resolved_config_path.write_text(json.dumps(resolved_payload, indent=2))
     if writer is not None:
         writer.add_text("config/json", json.dumps(resolved_payload, indent=2))
@@ -406,10 +470,13 @@ def train_codec(
     total_steps = steps
     if total_steps is None:
         total_steps = config.optimization.smoke_test_steps if smoke_test else config.optimization.main_steps
-
-    best_val_loss = float("inf")
+    if total_steps < start_step:
+        raise ValueError(
+            f"Requested total steps {total_steps} is smaller than resume start step {start_step}. "
+            "Pass a larger --steps value when resuming."
+        )
     try:
-        for step in range(1, total_steps + 1):
+        for step in range(start_step, total_steps + 1):
             started_at = time.perf_counter()
             model.train()
             if adversarial_components is not None:
