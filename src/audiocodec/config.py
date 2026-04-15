@@ -194,7 +194,9 @@ class BalancerConfig:
 
 @dataclass(slots=True)
 class OptimizationConfig:
+    optimizer: str = "adamw"
     learning_rate: float = 2e-4
+    betas: tuple[float, float] = (0.9, 0.999)
     weight_decay: float = 1e-4
     batch_size: int = 16
     smoke_test_steps: int = 500
@@ -206,6 +208,13 @@ class OptimizationConfig:
     num_workers: int = 0
     max_eval_batches: int = 8
     seed: int = 1337
+
+    def __post_init__(self) -> None:
+        self.betas = tuple(self.betas)
+        if self.optimizer not in {"adam", "adamw"}:
+            raise ValueError("optimizer must be either 'adam' or 'adamw'.")
+        if len(self.betas) != 2:
+            raise ValueError("betas must contain exactly two values.")
 
 
 @dataclass(slots=True)

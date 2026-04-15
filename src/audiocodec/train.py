@@ -201,6 +201,25 @@ def build_adversarial_components(
     )
 
 
+def build_generator_optimizer(
+    model: nn.Module,
+    config: CodecExperimentConfig,
+) -> torch.optim.Optimizer:
+    if config.optimization.optimizer == "adam":
+        return torch.optim.Adam(
+            model.parameters(),
+            lr=config.optimization.learning_rate,
+            betas=config.optimization.betas,
+            weight_decay=config.optimization.weight_decay,
+        )
+    return torch.optim.AdamW(
+        model.parameters(),
+        lr=config.optimization.learning_rate,
+        betas=config.optimization.betas,
+        weight_decay=config.optimization.weight_decay,
+    )
+
+
 def append_metrics(metrics_path: Path, payload: dict) -> None:
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
     with metrics_path.open("a") as handle:
@@ -354,11 +373,7 @@ def train_codec(
     criterion = build_loss(config).to(resolved_device)
     adversarial_components = build_adversarial_components(config, device=resolved_device)
     balancer = build_balancer(config)
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=config.optimization.learning_rate,
-        weight_decay=config.optimization.weight_decay,
-    )
+    optimizer = build_generator_optimizer(model=model, config=config)
 
     amp_enabled = (
         config.optimization.mixed_precision

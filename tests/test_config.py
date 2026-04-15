@@ -54,6 +54,9 @@ class ConfigTests(unittest.TestCase):
         self.assertTrue(config.balancer.enabled)
         self.assertEqual(config.adversarial.n_ffts, (1024, 2048, 512, 256, 128))
         self.assertEqual(config.balancer.total_norm, 1.0)
+        self.assertEqual(config.optimization.optimizer, "adam")
+        self.assertEqual(config.optimization.betas, (0.5, 0.9))
+        self.assertEqual(config.optimization.weight_decay, 0.0)
 
 
 if __name__ == "__main__":
