@@ -1,6 +1,6 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-04-13
+Last reviewed: 2026-04-15
 
 # AudioCodec
 
@@ -13,8 +13,8 @@ Last reviewed: 2026-04-13
 - [项目总览](./docs/overview.md)
 - [基线架构说明](./docs/architecture/baseline-neural-codec.md)
 - [Encodec-Inspired 架构说明](./docs/architecture/encodec-inspired-codec.md)
-- [当前执行计划](./plans/active/TASK-001-course-project-bootstrap.md)
-- [Encodec-Inspired 转向计划](./plans/active/TASK-003-encodec-inspired-pivot.md)
+- [当前执行计划](./plans/active/TASK-006-traditional-codec-benchmark.md)
+- [最新归档计划：训练对齐阶段](./plans/archive/TASK-005-encodec-training-alignment.md)
 - [范围决策 ADR](./docs/adr/0001-course-project-scope.md)
 
 ## 环境安装
@@ -58,3 +58,10 @@ python scripts/train_codec.py --dataset-root /path/to/LibriSpeech/dev-clean --sm
   在 baseline 上打开 `mel loss` 的对照实验。
 - `configs/encodec-inspired.json`
   当前主力路线，使用 `SEANet + EMA RVQ`，目标是把音质提升到可用级别。
+- `configs/ablation-adversarial-msstft-balanced.json`
+  当前已验证可用的高保真训练路线，使用 `MS-STFT discriminator + feature matching + balancer`。
+
+## 评测目录
+
+- `evals/`
+  承载传统 codec baseline、benchmark 脚本和结果汇总，避免与 `src/` 的主训练代码耦合。

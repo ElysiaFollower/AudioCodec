@@ -1,0 +1,88 @@
+{
+  "dataset": {
+    "root": "/home/lujingyu/lujingyu_data/data/AUDIO_DATA/librispeech_asr/clean/train.100",
+    "train_minutes": 60,
+    "val_minutes": 10,
+    "test_minutes": 10
+  },
+  "audio": {
+    "sample_rate": 16000,
+    "channels": 1,
+    "train_clip_seconds": 2.0,
+    "eval_clip_seconds": 2.0
+  },
+  "model": {
+    "architecture": "seanet",
+    "latent_dim": 128,
+    "seanet_filters": 32,
+    "seanet_ratios": [8, 5, 4, 2],
+    "seanet_residual_layers": 1,
+    "seanet_residual_kernel_size": 3,
+    "seanet_dilation_base": 2,
+    "seanet_compress": 2,
+    "seanet_lstm_layers": 2,
+    "seanet_kernel_size": 7,
+    "seanet_last_kernel_size": 7,
+    "seanet_norm": "weight_norm",
+    "seanet_true_skip": false
+  },
+  "quantizer": {
+    "codebook_size": 1024,
+    "num_quantizers": 24,
+    "commitment_weight": 1.0,
+    "codebook_weight": 0.0,
+    "ema_decay": 0.99,
+    "kmeans_init": true,
+    "kmeans_iters": 20,
+    "dead_code_threshold": 2
+  },
+  "loss": {
+    "waveform_weight": 0.1,
+    "stft_weight": 2.0,
+    "fft_sizes": [512, 1024, 2048],
+    "mel_weight": 0.0,
+    "mel_n_mels": 80,
+    "mel_fft_size": 1024,
+    "mel_hop_length": 256,
+    "mel_f_min": 0.0,
+    "mel_f_max": null
+  },
+  "adversarial": {
+    "enabled": true,
+    "discriminator": "msstftd",
+    "loss_type": "hinge",
+    "adversarial_weight": 4.0,
+    "feature_matching_weight": 4.0,
+    "discriminator_filters": 32,
+    "discriminator_learning_rate": 0.0002,
+    "discriminator_betas": [0.5, 0.9],
+    "discriminator_weight_decay": 0.0,
+    "n_ffts": [1024, 2048, 512, 256, 128],
+    "hop_lengths": [256, 512, 128, 64, 32],
+    "win_lengths": [1024, 2048, 512, 256, 128]
+  },
+  "balancer": {
+    "enabled": true,
+    "balance_grads": true,
+    "ema_decay": 0.999,
+    "total_norm": 1.0,
+    "per_batch_item": true,
+    "epsilon": 1e-12
+  },
+  "optimization": {
+    "optimizer": "adam",
+    "learning_rate": 0.0003,
+    "betas": [0.5, 0.9],
+    "weight_decay": 0.0,
+    "batch_size": 8,
+    "smoke_test_steps": 200,
+    "main_steps": 20000,
+    "mixed_precision": false,
+    "eval_interval": 1000,
+    "checkpoint_interval": 1000,
+    "log_interval": 50,
+    "num_workers": 8,
+    "max_eval_batches": 8,
+    "seed": 1337
+  }
+}

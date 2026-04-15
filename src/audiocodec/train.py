@@ -8,11 +8,19 @@ import json
 from pathlib import Path
 import random
 import time
+from typing import Any
 
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
+from audiocodec.adversarial import (
+    FeatureMatchingLoss,
+    MultiScaleSTFTDiscriminator,
+    discriminator_adversarial_loss,
+    generator_adversarial_loss,
+)
+from audiocodec.balancer import Balancer
 from audiocodec.config import CodecExperimentConfig
 from audiocodec.data.librispeech import (
     SpeechSegmentDataset,
@@ -35,6 +43,38 @@ class TrainingArtifacts:
     resolved_config_path: Path
     metrics_path: Path
     tensorboard_dir: Path | None = None
+
+
+@dataclass(slots=True)
+class AdversarialComponents:
+    discriminator: MultiScaleSTFTDiscriminator
+    optimizer: torch.optim.Optimizer
+    feature_matching_loss: FeatureMatchingLoss
+
+
+def build_balancer(config: CodecExperimentConfig) -> Balancer | None:
+    if not config.balancer.enabled:
+        return None
+
+    weights: dict[str, float] = {}
+    if config.loss.waveform_weight > 0:
+        weights["waveform_loss"] = config.loss.waveform_weight
+    if config.loss.stft_weight > 0:
+        weights["stft_loss"] = config.loss.stft_weight
+    if config.loss.mel_weight > 0:
+        weights["mel_loss"] = config.loss.mel_weight
+    if config.adversarial.enabled and config.adversarial.adversarial_weight > 0:
+        weights["generator_adversarial_loss"] = config.adversarial.adversarial_weight
+    if config.adversarial.enabled and config.adversarial.feature_matching_weight > 0:
+        weights["feature_matching_loss"] = config.adversarial.feature_matching_weight
+    return Balancer(
+        weights=weights,
+        balance_grads=config.balancer.balance_grads,
+        total_norm=config.balancer.total_norm,
+        ema_decay=config.balancer.ema_decay,
+        per_batch_item=config.balancer.per_batch_item,
+        epsilon=config.balancer.epsilon,
+    )
 
 
 def set_seed(seed: int) -> None:
@@ -135,10 +175,146 @@ def build_loss(config: CodecExperimentConfig) -> CodecLoss:
     )
 
 
+def build_adversarial_components(
+    config: CodecExperimentConfig,
+    device: torch.device,
+) -> AdversarialComponents | None:
+    if not config.adversarial.enabled:
+        return None
+
+    discriminator = MultiScaleSTFTDiscriminator(
+        filters=config.adversarial.discriminator_filters,
+        in_channels=config.audio.channels,
+        n_ffts=config.adversarial.n_ffts,
+        hop_lengths=config.adversarial.hop_lengths,
+        win_lengths=config.adversarial.win_lengths,
+    ).to(device)
+    optimizer = torch.optim.Adam(
+        discriminator.parameters(),
+        lr=config.adversarial.discriminator_learning_rate,
+        betas=config.adversarial.discriminator_betas,
+        weight_decay=config.adversarial.discriminator_weight_decay,
+    )
+    return AdversarialComponents(
+        discriminator=discriminator,
+        optimizer=optimizer,
+        feature_matching_loss=FeatureMatchingLoss(),
+    )
+
+
+def build_generator_optimizer(
+    model: nn.Module,
+    config: CodecExperimentConfig,
+) -> torch.optim.Optimizer:
+    if config.optimization.optimizer == "adam":
+        return torch.optim.Adam(
+            model.parameters(),
+            lr=config.optimization.learning_rate,
+            betas=config.optimization.betas,
+            weight_decay=config.optimization.weight_decay,
+        )
+    return torch.optim.AdamW(
+        model.parameters(),
+        lr=config.optimization.learning_rate,
+        betas=config.optimization.betas,
+        weight_decay=config.optimization.weight_decay,
+    )
+
+
 def append_metrics(metrics_path: Path, payload: dict) -> None:
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
     with metrics_path.open("a") as handle:
         handle.write(json.dumps(payload) + "\n")
+
+
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2))
+
+
+def _read_logged_steps(metrics_path: Path) -> tuple[int | None, float | None]:
+    if not metrics_path.exists():
+        return None, None
+
+    last_logged_step: int | None = None
+    best_val_loss: float | None = None
+    with metrics_path.open() as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            step = payload.get("step")
+            if isinstance(step, int):
+                last_logged_step = step
+            if payload.get("split") == "val":
+                val_loss = payload.get("total_loss")
+                if isinstance(val_loss, (int, float)):
+                    if best_val_loss is None or float(val_loss) < best_val_loss:
+                        best_val_loss = float(val_loss)
+    return last_logged_step, best_val_loss
+
+
+def _flatten_config(payload: dict[str, Any], prefix: str = "") -> dict[str, Any]:
+    flattened: dict[str, Any] = {}
+    for key, value in payload.items():
+        path = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            flattened.update(_flatten_config(value, prefix=path))
+        else:
+            flattened[path] = value
+    return flattened
+
+
+def _assert_resume_config_matches(current_config: dict[str, Any], checkpoint_config: dict[str, Any]) -> None:
+    current = _flatten_config(current_config)
+    previous = _flatten_config(checkpoint_config)
+    differences: list[str] = []
+    for key in sorted(set(current) | set(previous)):
+        if current.get(key) != previous.get(key):
+            differences.append(f"{key}: checkpoint={previous.get(key)!r}, current={current.get(key)!r}")
+    if differences:
+        summary = "\n".join(differences[:10])
+        if len(differences) > 10:
+            summary += f"\n... and {len(differences) - 10} more differences"
+        raise ValueError(
+            "Resume config does not match the checkpoint config.\n"
+            f"{summary}"
+        )
+
+
+def _capture_rng_state() -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "python_random_state": random.getstate(),
+        "torch_rng_state": torch.get_rng_state(),
+    }
+    if torch.cuda.is_available():
+        payload["torch_cuda_rng_state_all"] = torch.cuda.get_rng_state_all()
+    return payload
+
+
+def _restore_rng_state(state: dict[str, Any]) -> None:
+    python_state = state.get("python_random_state")
+    torch_state = state.get("torch_rng_state")
+    if python_state is not None:
+        random.setstate(python_state)
+    if torch_state is not None:
+        torch.set_rng_state(torch_state)
+    cuda_states = state.get("torch_cuda_rng_state_all")
+    if cuda_states is not None and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(cuda_states)
+
+
+def _resume_limitations(config: CodecExperimentConfig, overfit_example_path: str | None) -> list[str]:
+    limitations: list[str] = []
+    if config.optimization.num_workers > 0 and overfit_example_path is None:
+        limitations.append(
+            "num_workers > 0 means dataloader worker progress is not checkpointed; resumed runs are warm continuations, not exact sample-order continuations."
+        )
+    if config.audio.train_clip_seconds is not None and overfit_example_path is None:
+        limitations.append(
+            "random crop offsets and sampler progress are not checkpointed; resumed runs may diverge slightly from uninterrupted training even though model and optimizer states are restored."
+        )
+    return limitations
 
 
 def create_tensorboard_writer(output_dir: Path, enabled: bool):
@@ -165,18 +341,31 @@ def save_checkpoint(
     step: int,
     config: CodecExperimentConfig,
     metrics: dict[str, float],
+    discriminator: nn.Module | None = None,
+    discriminator_optimizer: torch.optim.Optimizer | None = None,
+    balancer: Balancer | None = None,
+    scaler: torch.amp.GradScaler | None = None,
+    rng_state: dict[str, Any] | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "step": step,
-            "config": config.to_dict(),
-            "metrics": metrics,
-        },
-        path,
-    )
+    payload = {
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "step": step,
+        "config": config.to_dict(),
+        "metrics": metrics,
+    }
+    if discriminator is not None:
+        payload["discriminator"] = discriminator.state_dict()
+    if discriminator_optimizer is not None:
+        payload["discriminator_optimizer"] = discriminator_optimizer.state_dict()
+    if balancer is not None:
+        payload["balancer"] = balancer.state_dict()
+    if scaler is not None:
+        payload["scaler"] = scaler.state_dict()
+    if rng_state is not None:
+        payload["rng_state"] = rng_state
+    torch.save(payload, path)
 
 
 def save_reconstruction_examples(
@@ -248,9 +437,19 @@ def _ensure_finite_metrics(metrics: dict[str, torch.Tensor] | dict[str, float], 
             raise FloatingPointError(f"Non-finite {split} metric `{name}` detected at step {step}.")
 
 
+def _set_requires_grad(module: nn.Module, requires_grad: bool) -> None:
+    for parameter in module.parameters():
+        parameter.requires_grad_(requires_grad)
+
+
+def _load_checkpoint(path: Path) -> dict:
+    return torch.load(path, map_location="cpu")
+
+
 def train_codec(
     config: CodecExperimentConfig,
     output_dir: str | Path,
+    resume_from: str | Path | None = None,
     steps: int | None = None,
     smoke_test: bool = False,
     limit_train_examples: int | None = None,
@@ -261,7 +460,10 @@ def train_codec(
     output_path = Path(output_dir).expanduser().resolve()
     output_path.mkdir(parents=True, exist_ok=True)
     metrics_path = output_path / "metrics.jsonl"
-    if metrics_path.exists():
+    resolved_config_path = output_path / "resolved_config.json"
+    resume_history_path = output_path / "resume_history.jsonl"
+    resume_path = Path(resume_from).expanduser().resolve() if resume_from is not None else None
+    if metrics_path.exists() and resume_path is None:
         raise FileExistsError(
             f"Output directory {output_path} already contains metrics.jsonl. "
             "Use a fresh --output-dir because resume/mixed-run logging is not supported."
@@ -277,18 +479,74 @@ def train_codec(
 
     model = build_codec_model(config).to(resolved_device)
     criterion = build_loss(config).to(resolved_device)
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=config.optimization.learning_rate,
-        weight_decay=config.optimization.weight_decay,
-    )
+    adversarial_components = build_adversarial_components(config, device=resolved_device)
+    balancer = build_balancer(config)
+    optimizer = build_generator_optimizer(model=model, config=config)
+    start_step = 1
+    last_logged_step, best_val_loss = _read_logged_steps(metrics_path)
+    if best_val_loss is None:
+        best_val_loss = float("inf")
 
-    amp_enabled = config.optimization.mixed_precision and resolved_device.type == "cuda"
+    if resume_path is not None:
+        checkpoint = _load_checkpoint(resume_path)
+        checkpoint_config = checkpoint.get("config")
+        if not isinstance(checkpoint_config, dict):
+            raise ValueError(f"Checkpoint {resume_path} does not contain a valid config payload.")
+        _assert_resume_config_matches(config.to_dict(), checkpoint_config)
+        model.load_state_dict(checkpoint["model"])
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        start_step = int(checkpoint["step"]) + 1
+
+        if adversarial_components is not None:
+            if "discriminator" not in checkpoint or "discriminator_optimizer" not in checkpoint:
+                raise ValueError(
+                    f"Checkpoint {resume_path} does not contain discriminator state, "
+                    "but the active config enables adversarial training."
+                )
+            adversarial_components.discriminator.load_state_dict(checkpoint["discriminator"])
+            adversarial_components.optimizer.load_state_dict(checkpoint["discriminator_optimizer"])
+        elif "discriminator" in checkpoint:
+            raise ValueError(
+                f"Checkpoint {resume_path} contains discriminator state, "
+                "but the active config disables adversarial training."
+            )
+        if balancer is not None:
+            if "balancer" not in checkpoint:
+                raise ValueError(
+                    f"Checkpoint {resume_path} does not contain balancer state, "
+                    "but the active config enables the balancer."
+                )
+            balancer.load_state_dict(checkpoint["balancer"])
+        elif "balancer" in checkpoint:
+            raise ValueError(
+                f"Checkpoint {resume_path} contains balancer state, "
+                "but the active config disables the balancer."
+            )
+
+        if last_logged_step is not None and start_step <= last_logged_step:
+            raise ValueError(
+                f"Resume step {start_step} from {resume_path} would overlap with existing logs "
+                f"in {metrics_path} (last logged step: {last_logged_step})."
+            )
+        checkpoint_val_loss = checkpoint.get("metrics", {}).get("total_loss")
+        if best_val_loss == float("inf") and isinstance(checkpoint_val_loss, (int, float)):
+            best_val_loss = float(checkpoint_val_loss)
+
+    amp_enabled = (
+        config.optimization.mixed_precision
+        and resolved_device.type == "cuda"
+        and adversarial_components is None
+        and balancer is None
+    )
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
+    if resume_path is not None:
+        checkpoint = _load_checkpoint(resume_path)
+        if "scaler" in checkpoint:
+            scaler.load_state_dict(checkpoint["scaler"])
+        if "rng_state" in checkpoint:
+            _restore_rng_state(checkpoint["rng_state"])
     train_iterator = cycle_dataloader(train_loader)
     writer = create_tensorboard_writer(output_path, enabled=tensorboard)
-
-    resolved_config_path = output_path / "resolved_config.json"
     resolved_payload = config.to_dict()
     if overfit_example_path is not None:
         resolved_payload.setdefault("debug", {})
@@ -300,19 +558,49 @@ def train_codec(
                 "random_crop": False,
             }
         )
-    resolved_config_path.write_text(json.dumps(resolved_payload, indent=2))
+    resolved_payload.setdefault("runtime", {})
+    resolved_payload["runtime"]["amp_enabled"] = amp_enabled
+    resolved_payload["runtime"]["resume_limitations"] = _resume_limitations(
+        config=config,
+        overfit_example_path=overfit_example_path,
+    )
+    if resume_path is not None:
+        resolved_payload["runtime"]["resume_from"] = str(resume_path)
+        resolved_payload["runtime"]["resume_start_step"] = start_step
+        append_metrics(
+            resume_history_path,
+            {
+                "timestamp_unix": time.time(),
+                "resume_from": str(resume_path),
+                "resume_start_step": start_step,
+                "resume_limitations": resolved_payload["runtime"]["resume_limitations"],
+            },
+        )
+        if not resolved_config_path.exists():
+            _write_json(resolved_config_path, resolved_payload)
+        _write_json(output_path / "resume_session.json", resolved_payload)
+        print(f"[resume] continuing from {resume_path} at step {start_step}")
+        for limitation in resolved_payload["runtime"]["resume_limitations"]:
+            print(f"[resume] warning: {limitation}")
+    else:
+        _write_json(resolved_config_path, resolved_payload)
     if writer is not None:
         writer.add_text("config/json", json.dumps(resolved_payload, indent=2))
 
     total_steps = steps
     if total_steps is None:
         total_steps = config.optimization.smoke_test_steps if smoke_test else config.optimization.main_steps
-
-    best_val_loss = float("inf")
+    if total_steps < start_step:
+        raise ValueError(
+            f"Requested total steps {total_steps} is smaller than resume start step {start_step}. "
+            "Pass a larger --steps value when resuming."
+        )
     try:
-        for step in range(1, total_steps + 1):
+        for step in range(start_step, total_steps + 1):
             started_at = time.perf_counter()
             model.train()
+            if adversarial_components is not None:
+                adversarial_components.discriminator.train()
             batch = next(train_iterator).to(resolved_device)
 
             optimizer.zero_grad(set_to_none=True)
@@ -330,18 +618,108 @@ def train_codec(
                 commitment_loss=output.commitment_loss.float(),
                 codebook_loss=output.codebook_loss.float(),
             )
-            total_loss = losses["total_loss"]
-            _ensure_finite_metrics(losses, split="train", step=step)
+            objective_total_loss = losses["total_loss"]
+            quantizer_total_loss = (
+                config.quantizer.commitment_weight * losses["commitment_loss"]
+                + config.quantizer.codebook_weight * losses["codebook_loss"]
+            )
+
+            discriminator_loss: torch.Tensor | None = None
+            generator_adv_loss_value: torch.Tensor | None = None
+            feature_matching_loss_value: torch.Tensor | None = None
+
+            if adversarial_components is not None:
+                discriminator = adversarial_components.discriminator
+
+                adversarial_components.optimizer.zero_grad(set_to_none=True)
+                fake_logits_for_d, _ = discriminator(output.reconstruction.detach().float())
+                real_logits_for_d, _ = discriminator(batch.float())
+                discriminator_loss = discriminator_adversarial_loss(
+                    fake_logits=fake_logits_for_d,
+                    real_logits=real_logits_for_d,
+                    loss_type=config.adversarial.loss_type,
+                )
+                _ensure_finite_metrics(
+                    {"discriminator_loss": discriminator_loss},
+                    split="train",
+                    step=step,
+                )
+                discriminator_loss.backward()
+                adversarial_components.optimizer.step()
+
+                _set_requires_grad(discriminator, False)
+                fake_logits_for_g, fake_feature_maps = discriminator(output.reconstruction.float())
+                with torch.no_grad():
+                    _, real_feature_maps = discriminator(batch.float())
+                generator_adv_loss_value = generator_adversarial_loss(
+                    fake_logits=fake_logits_for_g,
+                    loss_type=config.adversarial.loss_type,
+                )
+                feature_matching_loss_value = adversarial_components.feature_matching_loss(
+                    fake_feature_maps=fake_feature_maps,
+                    real_feature_maps=real_feature_maps,
+                )
+                _set_requires_grad(discriminator, True)
+
+            balanced_losses: dict[str, torch.Tensor] = {}
+            if balancer is not None:
+                if config.loss.waveform_weight > 0:
+                    balanced_losses["waveform_loss"] = losses["waveform_loss"]
+                if config.loss.stft_weight > 0:
+                    balanced_losses["stft_loss"] = losses["stft_loss"]
+                if config.loss.mel_weight > 0:
+                    balanced_losses["mel_loss"] = losses["mel_loss"]
+                if generator_adv_loss_value is not None and config.adversarial.adversarial_weight > 0:
+                    balanced_losses["generator_adversarial_loss"] = generator_adv_loss_value
+                if feature_matching_loss_value is not None and config.adversarial.feature_matching_weight > 0:
+                    balanced_losses["feature_matching_loss"] = feature_matching_loss_value
+
+            if balancer is not None:
+                if quantizer_total_loss.requires_grad:
+                    quantizer_total_loss.backward(retain_graph=True)
+                balanced_total_loss = balancer.backward(
+                    losses=balanced_losses,
+                    input_tensor=output.reconstruction.float(),
+                )
+                total_loss = balanced_total_loss + quantizer_total_loss.detach()
+            elif adversarial_components is not None:
+                total_loss = (
+                    objective_total_loss
+                    + config.adversarial.adversarial_weight * generator_adv_loss_value
+                    + config.adversarial.feature_matching_weight * feature_matching_loss_value
+                )
+            else:
+                total_loss = objective_total_loss
+
+            finite_metrics: dict[str, torch.Tensor] = dict(losses)
+            finite_metrics["generator_total_loss"] = total_loss
+            if discriminator_loss is not None:
+                finite_metrics["discriminator_loss"] = discriminator_loss
+            if generator_adv_loss_value is not None:
+                finite_metrics["generator_adversarial_loss"] = generator_adv_loss_value
+            if feature_matching_loss_value is not None:
+                finite_metrics["feature_matching_loss"] = feature_matching_loss_value
+            _ensure_finite_metrics(finite_metrics, split="train", step=step)
 
             if amp_enabled:
                 scaler.scale(total_loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
             else:
-                total_loss.backward()
+                if balancer is None:
+                    total_loss.backward()
                 optimizer.step()
 
             step_metrics = {name: float(value.item()) for name, value in losses.items()}
+            step_metrics["generator_total_loss"] = float(total_loss.item())
+            if discriminator_loss is not None:
+                step_metrics["discriminator_loss"] = float(discriminator_loss.item())
+            if generator_adv_loss_value is not None:
+                step_metrics["generator_adversarial_loss"] = float(generator_adv_loss_value.item())
+            if feature_matching_loss_value is not None:
+                step_metrics["feature_matching_loss"] = float(feature_matching_loss_value.item())
+            if balancer is not None:
+                step_metrics.update(balancer.metrics)
             step_metrics["step_time_seconds"] = time.perf_counter() - started_at
 
             if step == 1 or step % config.optimization.log_interval == 0:
@@ -349,10 +727,17 @@ def train_codec(
                 if writer is not None:
                     for name, value in step_metrics.items():
                         writer.add_scalar(f"train/{name}", value, global_step=step)
-                print(
-                    f"[train] step={step} total={step_metrics['total_loss']:.4f} "
+                message = (
+                    f"[train] step={step} total={step_metrics['generator_total_loss']:.4f} "
                     f"waveform={step_metrics['waveform_loss']:.4f} stft={step_metrics['stft_loss']:.4f}"
                 )
+                if "generator_adversarial_loss" in step_metrics:
+                    message += (
+                        f" adv={step_metrics['generator_adversarial_loss']:.4f}"
+                        f" feat={step_metrics['feature_matching_loss']:.4f}"
+                        f" d={step_metrics['discriminator_loss']:.4f}"
+                    )
+                print(message)
 
             should_evaluate = (
                 step == total_steps
@@ -395,6 +780,15 @@ def train_codec(
                     step=step,
                     config=config,
                     metrics=val_metrics,
+                    discriminator=(
+                        adversarial_components.discriminator if adversarial_components is not None else None
+                    ),
+                    discriminator_optimizer=(
+                        adversarial_components.optimizer if adversarial_components is not None else None
+                    ),
+                    balancer=balancer,
+                    scaler=scaler,
+                    rng_state=_capture_rng_state(),
                 )
 
                 if val_metrics["total_loss"] < best_val_loss:
@@ -406,6 +800,15 @@ def train_codec(
                         step=step,
                         config=config,
                         metrics=val_metrics,
+                        discriminator=(
+                            adversarial_components.discriminator if adversarial_components is not None else None
+                        ),
+                        discriminator_optimizer=(
+                            adversarial_components.optimizer if adversarial_components is not None else None
+                        ),
+                        balancer=balancer,
+                        scaler=scaler,
+                        rng_state=_capture_rng_state(),
                     )
                 model.train()
     finally:

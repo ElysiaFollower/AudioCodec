@@ -18,6 +18,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", type=Path, default=Path("configs/baseline.json"))
     parser.add_argument("--dataset-root", type=str, default=None)
     parser.add_argument("--output-dir", type=Path, default=Path("artifacts/baseline-train"))
+    parser.add_argument("--resume-from", type=Path, default=None)
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--smoke-test", action="store_true")
     parser.add_argument("--limit-train-examples", type=int, default=None)
@@ -45,6 +46,7 @@ def main() -> None:
     train_codec(
         config=config,
         output_dir=args.output_dir,
+        resume_from=args.resume_from,
         steps=args.steps,
         smoke_test=args.smoke_test,
         limit_train_examples=args.limit_train_examples,

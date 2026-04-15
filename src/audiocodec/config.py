@@ -135,8 +135,68 @@ class LossConfig:
 
 
 @dataclass(slots=True)
+class AdversarialConfig:
+    enabled: bool = False
+    discriminator: str = "msstftd"
+    loss_type: str = "hinge"
+    adversarial_weight: float = 4.0
+    feature_matching_weight: float = 4.0
+    discriminator_filters: int = 32
+    discriminator_learning_rate: float = 2e-4
+    discriminator_betas: tuple[float, float] = (0.5, 0.9)
+    discriminator_weight_decay: float = 0.0
+    n_ffts: tuple[int, ...] = (1024, 2048, 512)
+    hop_lengths: tuple[int, ...] = (256, 512, 128)
+    win_lengths: tuple[int, ...] = (1024, 2048, 512)
+
+    def __post_init__(self) -> None:
+        self.discriminator_betas = tuple(self.discriminator_betas)
+        self.n_ffts = tuple(self.n_ffts)
+        self.hop_lengths = tuple(self.hop_lengths)
+        self.win_lengths = tuple(self.win_lengths)
+        if self.discriminator not in {"msstftd"}:
+            raise ValueError("discriminator must be 'msstftd'.")
+        if self.loss_type not in {"hinge", "mse"}:
+            raise ValueError("loss_type must be either 'hinge' or 'mse'.")
+        if self.adversarial_weight < 0:
+            raise ValueError("adversarial_weight must be non-negative.")
+        if self.feature_matching_weight < 0:
+            raise ValueError("feature_matching_weight must be non-negative.")
+        if self.discriminator_filters <= 0:
+            raise ValueError("discriminator_filters must be positive.")
+        if self.discriminator_learning_rate <= 0:
+            raise ValueError("discriminator_learning_rate must be positive.")
+        if len(self.discriminator_betas) != 2:
+            raise ValueError("discriminator_betas must contain exactly two values.")
+        if len(self.n_ffts) == 0:
+            raise ValueError("n_ffts must not be empty.")
+        if not (len(self.n_ffts) == len(self.hop_lengths) == len(self.win_lengths)):
+            raise ValueError("n_ffts, hop_lengths, and win_lengths must have the same length.")
+
+
+@dataclass(slots=True)
+class BalancerConfig:
+    enabled: bool = False
+    balance_grads: bool = True
+    ema_decay: float = 0.999
+    total_norm: float = 1.0
+    per_batch_item: bool = True
+    epsilon: float = 1e-12
+
+    def __post_init__(self) -> None:
+        if not 0.0 < self.ema_decay <= 1.0:
+            raise ValueError("ema_decay must be in (0, 1].")
+        if self.total_norm <= 0:
+            raise ValueError("total_norm must be positive.")
+        if self.epsilon <= 0:
+            raise ValueError("epsilon must be positive.")
+
+
+@dataclass(slots=True)
 class OptimizationConfig:
+    optimizer: str = "adamw"
     learning_rate: float = 2e-4
+    betas: tuple[float, float] = (0.9, 0.999)
     weight_decay: float = 1e-4
     batch_size: int = 16
     smoke_test_steps: int = 500
@@ -149,6 +209,13 @@ class OptimizationConfig:
     max_eval_batches: int = 8
     seed: int = 1337
 
+    def __post_init__(self) -> None:
+        self.betas = tuple(self.betas)
+        if self.optimizer not in {"adam", "adamw"}:
+            raise ValueError("optimizer must be either 'adam' or 'adamw'.")
+        if len(self.betas) != 2:
+            raise ValueError("betas must contain exactly two values.")
+
 
 @dataclass(slots=True)
 class CodecExperimentConfig:
@@ -157,6 +224,8 @@ class CodecExperimentConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     quantizer: RVQConfig = field(default_factory=RVQConfig)
     loss: LossConfig = field(default_factory=LossConfig)
+    adversarial: AdversarialConfig = field(default_factory=AdversarialConfig)
+    balancer: BalancerConfig = field(default_factory=BalancerConfig)
     optimization: OptimizationConfig = field(default_factory=OptimizationConfig)
 
     @property
@@ -174,6 +243,8 @@ class CodecExperimentConfig:
             model=ModelConfig(**payload.get("model", {})),
             quantizer=RVQConfig(**payload.get("quantizer", {})),
             loss=LossConfig(**payload.get("loss", {})),
+            adversarial=AdversarialConfig(**payload.get("adversarial", {})),
+            balancer=BalancerConfig(**payload.get("balancer", {})),
             optimization=OptimizationConfig(**payload.get("optimization", {})),
         )
 

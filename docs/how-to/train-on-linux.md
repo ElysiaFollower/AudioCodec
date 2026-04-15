@@ -1,6 +1,6 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-04-14
+Last reviewed: 2026-04-15
 
 # Linux 训练说明
 
@@ -172,6 +172,43 @@ echo "LOG=$LOG"
 - 约 `12 kbps` 名义码率
 - `mel loss` 作为默认开启的感知增强项
 - 默认关闭 `mixed precision`，优先保证数值稳定
+
+## Resume 训练
+
+当前训练脚本支持从已有 checkpoint 继续训练：
+
+```bash
+mkdir -p logs artifacts
+LOG=logs/linux-adversarial-msstft-balanced-resume.$(date +%F-%H%M%S).log
+
+nohup env CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src PYTHONUNBUFFERED=1 \
+  python -u scripts/train_codec.py \
+    --config configs/ablation-adversarial-msstft-balanced.json \
+    --output-dir artifacts/linux-adversarial-msstft-balanced \
+    --resume-from artifacts/linux-adversarial-msstft-balanced/checkpoints/step-020000.pt \
+    --steps 50000 \
+    --device cuda \
+    --tensorboard \
+  > "$LOG" 2>&1 &
+```
+
+注意：
+
+- `--steps` 表示续训后的总目标步数，不是“再训练多少步”
+- `resume` 会恢复 `model`、generator/discriminator optimizer、`Balancer`、`GradScaler`、Python/Torch/CUDA RNG 状态
+- `resume` 会校验当前配置是否和 checkpoint 配置一致，不一致会直接拒绝启动
+
+当前风险面：
+
+- 这是 `warm continuation`，不是严格意义上的 bitwise continuation
+- dataloader 当前批次位置、sampler 内部进度、worker 进程内的临时状态不会被 checkpoint
+- 当 `num_workers > 0` 且训练集启用了随机裁剪时，resume 后的样本顺序与 crop 轨迹可能和未中断训练略有偏差
+
+因此：
+
+- 对关键主实验，优先推荐从头完整跑通
+- 对长跑实验中断恢复、继续观察趋势、或节省少量已完成步数，resume 是可用的
+- 若团队成员需要“严格接续”的研究结论，请先明确这一限制，不要把 resume 结果当作和未中断训练完全等价
 
 ## 输出目录结构
 

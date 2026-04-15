@@ -15,6 +15,7 @@ class ConfigTests(unittest.TestCase):
         )
         self.assertEqual(config.frame_rate, 100)
         self.assertEqual(config.model.architecture, "conv")
+        self.assertFalse(config.adversarial.enabled)
 
     def test_mel_ablation_config_enables_mel_loss(self) -> None:
         config = load_experiment_config(Path("configs/ablation-mel-loss.json"))
@@ -28,6 +29,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.quantizer.codebook_size, 1024)
         self.assertEqual(config.quantizer.num_quantizers, 24)
         self.assertFalse(config.optimization.mixed_precision)
+        self.assertFalse(config.adversarial.enabled)
 
     def test_encodec_like_loss_ablation_matches_reference_direction(self) -> None:
         config = load_experiment_config(Path("configs/ablation-encodec-like-loss.json"))
@@ -36,6 +38,25 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.loss.stft_weight, 2.0)
         self.assertEqual(config.loss.mel_weight, 0.0)
         self.assertFalse(config.optimization.mixed_precision)
+        self.assertFalse(config.adversarial.enabled)
+
+    def test_adversarial_ablation_config_enables_msstft_discriminator(self) -> None:
+        config = load_experiment_config(Path("configs/ablation-adversarial-msstft.json"))
+        self.assertTrue(config.adversarial.enabled)
+        self.assertEqual(config.adversarial.discriminator, "msstftd")
+        self.assertEqual(config.adversarial.loss_type, "hinge")
+        self.assertEqual(config.adversarial.adversarial_weight, 4.0)
+        self.assertEqual(config.adversarial.feature_matching_weight, 4.0)
+
+    def test_balanced_adversarial_config_enables_local_balancer(self) -> None:
+        config = load_experiment_config(Path("configs/ablation-adversarial-msstft-balanced.json"))
+        self.assertTrue(config.adversarial.enabled)
+        self.assertTrue(config.balancer.enabled)
+        self.assertEqual(config.adversarial.n_ffts, (1024, 2048, 512, 256, 128))
+        self.assertEqual(config.balancer.total_norm, 1.0)
+        self.assertEqual(config.optimization.optimizer, "adam")
+        self.assertEqual(config.optimization.betas, (0.5, 0.9))
+        self.assertEqual(config.optimization.weight_decay, 0.0)
 
 
 if __name__ == "__main__":
