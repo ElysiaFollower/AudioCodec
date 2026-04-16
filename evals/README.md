@@ -22,8 +22,27 @@ evals/
   outputs/
 ```
 
-当前优先事项：
+当前推荐工作流：
 
-1. 落地 `MP3` baseline
-2. 统一 neural codec 与传统 codec 的对比输入输出
-3. 汇总压缩率、码率与保真度指标
+1. 用 `evals/scripts/build_manifest.py` 固定 benchmark 样本集
+2. 用 `evals/scripts/export_neural_codec.py` 导出 neural codec 重建结果
+3. 用 `evals/scripts/run_traditional_codec.py` 生成 `MP3 / Opus / AAC / FLAC` 重建结果
+4. 用 `evals/scripts/score_outputs.py` 统一计算压缩率和重建质量指标
+
+第一版已经支持：
+
+- deterministic manifest
+- neural codec export
+- `MP3 / Opus / AAC / FLAC` encode-decode baseline
+- 汇总：
+  - `actual_bitrate_kbps`
+  - `compression_ratio_vs_pcm16`
+  - `log_spectral_distance`
+  - `multi_scale_stft`
+  - `si_sdr_db`
+  - `stoi`（若环境中安装了 `pystoi`）
+
+说明：
+
+- `ViSQOL` 暂未并入当前默认脚本，因为它通常需要额外外部依赖和单独安装流程
+- neural codec 的压缩成本统计使用 `RVQ payload bytes`，而不是 checkpoint 大小
