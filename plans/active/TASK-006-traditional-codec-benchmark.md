@@ -1,6 +1,6 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-04-15
+Last reviewed: 2026-04-16
 
 # TASK-006 Traditional Codec Benchmark
 
@@ -11,7 +11,7 @@ Last reviewed: 2026-04-15
 - `neural codec` 和传统/经典 codec 在相同码率下谁的重建质量更好
 - 为达到相近质量，各自需要多少码率
 
-本阶段先收敛实验设计与评价口径，再实现 `evals/` 下的独立 benchmark 代码。
+本阶段目标已经从“设计 benchmark”推进到“完成 benchmark 收尾并为报告整理结果资产”。
 
 ## Background
 
@@ -54,6 +54,7 @@ Last reviewed: 2026-04-15
 - 统一导出 neural codec 与传统 codec 的重建结果
 - 统一统计压缩成本、质量指标和试听样例
 - 形成一版可直接写入报告/PPT 的结果表和图
+- 为报告整理 benchmark 结论、表格和典型 case
 
 ## Out Of Scope
 
@@ -396,6 +397,7 @@ evals/
 - 结果能直接回答：
   - same-bitrate superiority
   - same-quality efficiency
+- 报告大纲与 benchmark 产物已经对齐，能够直接进入报告撰写阶段
 
 ## Risks and Guardrails
 
@@ -407,10 +409,9 @@ evals/
 
 ## Immediate Next Step
 
-先实现 benchmark scaffold，并优先完成：
+当前 benchmark 主实验已经跑完，下一步优先做：
 
-1. manifest 规范
-2. `FLAC` sanity baseline
-3. `MP3 / Opus / AAC` encode-decode baseline
-4. multi-bitrate neural export spec
-5. primary metrics schema
+1. 系统整理 `evals/outputs/` 的结果
+2. 生成报告需要的汇总表与图
+3. 记录典型 artifact case
+4. 将当前实现阶段收尾，并切到以报告撰写为主的新阶段
