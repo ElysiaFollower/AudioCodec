@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Speech neural codec baseline for the MultiMedia course project."
 requires-python = ">=3.10"
 dependencies = [
+  "pystoi>=0.4.1,<1",
   "tensorboard>=2.16,<3",
   "torch>=2.2",
   "torchaudio>=2.2",
