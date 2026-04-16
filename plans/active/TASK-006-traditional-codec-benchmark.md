@@ -145,6 +145,25 @@ Last reviewed: 2026-04-15
   - 记录目标设置
   - 最终汇报 `actual bytes` 和 `actual bitrate`
 
+说明：
+
+- 这里的 `target bitrate` 只是对编码 operating point 的统一控制输入
+- 最终比较一律按 `actual bitrate` 和质量指标进行
+- 不要求各 codec “精确命中”目标码率
+
+### E1b: Codec-Native Default Experiment
+
+目标：避免只在人为 target bitrate 下比较。
+
+- 每个传统 codec 额外提供一个 `codec-native default` 运行点
+- 不人工指定码率
+- 直接记录：
+  - 实际输出大小
+  - 实际码率
+  - 重建质量
+- 这类点不替代 rate-controlled sweep，而是回答：
+  - “如果让传统 codec 以其默认/原生工作方式压缩，它会落在什么质量-码率位置上？”
+
 ### E2: Rate-Distortion View
 
 目标：从曲线视角看传统 codec 的效率。
@@ -168,6 +187,7 @@ Last reviewed: 2026-04-15
   - 追平 `Neural-2k / Neural-4k / Neural-8k / Neural-12k` 各自 `ViSQOL` 需要多少 kbps
   - 追平 `Neural-2k / Neural-4k / Neural-8k / Neural-12k` 各自 `STOI` 需要多少 kbps
 - 这是压缩效率结论的主要来源
+- `codec-native default` 点也应画进图中，作为传统 codec 自然 operating point 的参考
 
 ### E4: Subjective Triplets / AB
 
@@ -277,10 +297,15 @@ Last reviewed: 2026-04-15
 - 若客观指标和听感冲突：
   - 以试听样例和 triplet 结果补充说明
   - 不强行下单一结论
+- 传统 codec 的 headline 比较不能只看 `target bitrate`
+  - 必须看 `actual bitrate`
 - `FLAC` 只做 anchor，不和 lossy 低码率主表混为一谈
 - `Opus` 是 speech 低码率主传统对手
   - `MP3` 是课程指定 baseline
   - 若 neural codec 只赢 `MP3` 但输 `Opus`，结论必须诚实表达
+- 如果某传统 codec 在极低目标码率下退化到明显不可用：
+  - 可保留该点用于 RD 曲线边缘
+  - 但不应作为“headline same-quality 对比”的主证据
 
 ## Deliverables
 
@@ -331,6 +356,7 @@ evals/
 2. 接入 `MP3`
 3. 接入 `Opus`
 4. 接入 `AAC`
+5. 为每个传统 codec 提供 `default` mode
 
 ### Phase 3: Metric Pipeline
 

@@ -17,14 +17,17 @@ LOSSY_CODEC_OPTIONS = {
     "mp3": {
         "extension": ".mp3",
         "encoder_args": lambda kbps: ["-c:a", "libmp3lame", "-b:a", f"{kbps}k"],
+        "default_args": ["-c:a", "libmp3lame"],
     },
     "opus": {
         "extension": ".opus",
         "encoder_args": lambda kbps: ["-c:a", "libopus", "-b:a", f"{kbps}k", "-application", "voip"],
+        "default_args": ["-c:a", "libopus", "-application", "voip"],
     },
     "aac": {
         "extension": ".m4a",
         "encoder_args": lambda kbps: ["-c:a", "aac", "-b:a", f"{kbps}k"],
+        "default_args": ["-c:a", "aac"],
     },
 }
 
@@ -32,6 +35,7 @@ LOSSLESS_CODEC_OPTIONS = {
     "flac": {
         "extension": ".flac",
         "encoder_args": lambda _kbps: ["-c:a", "flac"],
+        "default_args": ["-c:a", "flac"],
     }
 }
 
@@ -40,6 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a traditional codec over a benchmark manifest.")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--codec", choices=("mp3", "opus", "aac", "flac"), required=True)
+    parser.add_argument("--mode", choices=("bitrate", "default"), default="bitrate")
     parser.add_argument("--bitrate-kbps", type=int, default=None)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--codec-label", type=str, required=True)
@@ -57,10 +62,14 @@ def main() -> None:
     compressed_dir.mkdir(parents=True, exist_ok=True)
     recon_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.codec in LOSSY_CODEC_OPTIONS and args.bitrate_kbps is None:
-        raise ValueError(f"--bitrate-kbps is required for codec {args.codec}.")
-    if args.codec in LOSSLESS_CODEC_OPTIONS and args.bitrate_kbps is not None:
-        raise ValueError(f"--bitrate-kbps must be omitted for lossless codec {args.codec}.")
+    if args.mode == "bitrate":
+        if args.codec in LOSSY_CODEC_OPTIONS and args.bitrate_kbps is None:
+            raise ValueError(f"--bitrate-kbps is required for codec {args.codec} in bitrate mode.")
+        if args.codec in LOSSLESS_CODEC_OPTIONS and args.bitrate_kbps is not None:
+            raise ValueError(f"--bitrate-kbps must be omitted for lossless codec {args.codec}.")
+    elif args.mode == "default":
+        if args.bitrate_kbps is not None:
+            raise ValueError("--bitrate-kbps must be omitted in default mode.")
 
     specs = LOSSY_CODEC_OPTIONS.get(args.codec) or LOSSLESS_CODEC_OPTIONS[args.codec]
     exported_rows: list[dict] = []
@@ -70,6 +79,7 @@ def main() -> None:
         compressed_path = compressed_dir / f"{row['id']}{specs['extension']}"
         recon_path = recon_dir / f"{row['id']}.wav"
 
+        encoder_args = specs["encoder_args"](args.bitrate_kbps) if args.mode == "bitrate" else specs["default_args"]
         run_ffmpeg(
             [
                 "-y",
@@ -82,7 +92,7 @@ def main() -> None:
                 "1",
                 "-ar",
                 str(row["sample_rate"]),
-                *specs["encoder_args"](args.bitrate_kbps),
+                *encoder_args,
                 str(compressed_path),
             ]
         )
@@ -120,6 +130,7 @@ def main() -> None:
                 "compressed_bytes": compressed_bytes,
                 "actual_bitrate_kbps": bytes_to_kbps(compressed_bytes, row["duration_seconds"]),
                 "target_bitrate_kbps": args.bitrate_kbps,
+                "codec_mode": args.mode,
             }
         )
 
@@ -131,6 +142,7 @@ def main() -> None:
                 "codec_family": "traditional",
                 "codec_name": args.codec,
                 "codec_label": args.codec_label,
+                "codec_mode": args.mode,
                 "target_bitrate_kbps": args.bitrate_kbps,
                 "items": len(exported_rows),
             },

@@ -27,7 +27,13 @@ evals/
 1. 用 `evals/scripts/build_manifest.py` 固定 benchmark 样本集
 2. 用 `evals/scripts/export_neural_codec.py` 导出 neural codec 重建结果
 3. 用 `evals/scripts/run_traditional_codec.py` 生成 `MP3 / Opus / AAC / FLAC` 重建结果
+   - 支持 `bitrate` mode：统一 target bitrate sweep
+   - 支持 `default` mode：不人工指定码率，观察 codec-native operating point
 4. 用 `evals/scripts/score_outputs.py` 统一计算压缩率和重建质量指标
+
+完整命令见：
+
+- [run-traditional-codec-benchmark.md](/Users/ely/workspace/research/audio/AudioCodec/docs/how-to/run-traditional-codec-benchmark.md)
 
 第一版已经支持：
 
