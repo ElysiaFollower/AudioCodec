@@ -1,6 +1,10 @@
 Owner: ely
-Status: active
+Status: archived
 Last reviewed: 2026-04-16
+
+# Archive Note
+
+本计划已经完成核心目标：`2 / 4 / 8 / 12 kbps` 的 neural codec 结果已经训练完毕，`Opus / MP3 / AAC / FLAC` benchmark 也已跑完并收集到统一评分结果。后续工作重心已经从“继续补 benchmark”转向“把 benchmark 结果整理为报告中的表格、图和论证段落”。
 
 # TASK-006 Traditional Codec Benchmark
 
