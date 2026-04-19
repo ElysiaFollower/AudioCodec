@@ -177,6 +177,22 @@
       min-height: 0;
     }
 
+    .compact-grid {
+      align-items: start;
+      align-content: start;
+    }
+
+    .benchmark-layout {
+      grid-template-columns: 0.78fr 1.22fr;
+      align-items: stretch;
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
     .grid-2 {
       grid-template-columns: 1.1fr 0.9fr;
     }
@@ -519,27 +535,42 @@
       justify-content: space-between;
       gap: 12px;
       width: 100%;
-      padding: 10px 12px;
-      border: 1px solid rgba(71, 121, 201, 0.16);
-      border-radius: var(--radius-md);
-      background: linear-gradient(180deg, #ffffff, #f0f6ff);
+      min-height: 72px;
+      padding: 14px 16px;
+      border: 1px solid rgba(71, 121, 201, 0.18);
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(238,246,255,0.95));
       color: var(--text);
       text-align: left;
       cursor: pointer;
       transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
-      box-shadow: 0 8px 18px rgba(23, 57, 110, 0.06);
+      box-shadow:
+        0 16px 28px rgba(23, 57, 110, 0.09),
+        inset 0 1px 0 rgba(255,255,255,0.9);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .audio-btn::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.55), transparent 34%);
+      pointer-events: none;
     }
 
     .audio-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 16px 30px rgba(23, 57, 110, 0.10);
-      border-color: rgba(47,111,235,0.22);
+      transform: translateY(-3px);
+      box-shadow:
+        0 22px 34px rgba(23, 57, 110, 0.12),
+        inset 0 1px 0 rgba(255,255,255,0.9);
+      border-color: rgba(47,111,235,0.24);
     }
 
     .audio-btn .left strong {
       display: block;
-      font-size: 13px;
-      margin-bottom: 4px;
+      font-size: 14px;
+      margin-bottom: 5px;
     }
 
     .audio-btn .left span {
@@ -548,16 +579,16 @@
     }
 
     .play-glyph {
-      width: 30px;
-      height: 30px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       display: grid;
       place-items: center;
       background: linear-gradient(180deg, var(--blue), var(--blue-2));
       color: white;
-      font-size: 12px;
-      box-shadow: 0 10px 20px rgba(47, 111, 235, 0.24);
-      flex: 0 0 36px;
+      font-size: 13px;
+      box-shadow: 0 12px 22px rgba(47, 111, 235, 0.28);
+      flex: 0 0 38px;
     }
 
     .caption-line {
@@ -665,19 +696,19 @@
     }
 
     .blob.general {
-      width: 312px;
-      height: 312px;
+      width: 334px;
+      height: 334px;
       right: 6%;
-      top: 24px;
+      top: 12px;
       background: radial-gradient(circle at 32% 30%, rgba(130, 180, 255, 0.65), rgba(94, 146, 232, 0.15) 66%, rgba(94, 146, 232, 0.06) 100%);
       border: 1px solid rgba(79, 131, 218, 0.16);
     }
 
     .blob.speech {
-      width: 172px;
-      height: 172px;
+      width: 192px;
+      height: 192px;
       right: 22%;
-      top: 126px;
+      top: 118px;
       background: radial-gradient(circle at 32% 30%, rgba(49, 111, 235, 0.55), rgba(49, 111, 235, 0.14) 70%, rgba(49, 111, 235, 0.05) 100%);
       border: 1px solid rgba(47, 111, 235, 0.22);
     }
@@ -715,9 +746,9 @@
     }
 
     .label-speech {
-      right: 24%;
-      top: 176px;
-      width: 132px;
+      right: 23.5%;
+      top: 182px;
+      width: 144px;
       text-align: center;
       background: transparent;
       border: none;
@@ -816,14 +847,14 @@
         display: grid;
       }
       .blob.general {
-        width: 250px;
-        height: 250px;
+        width: 266px;
+        height: 266px;
       }
       .blob.speech {
-        width: 138px;
-        height: 138px;
+        width: 148px;
+        height: 148px;
         right: 21%;
-        top: 124px;
+        top: 116px;
       }
     }
   </style>
@@ -912,7 +943,7 @@
               最容易理解的方式，是把它看成一个带离散 bottleneck 的自编码器：中间不再保留自由连续隐向量，而是变成可以存储、可以传输的 token 序列。
             </div>
           </div>
-          <div class="content-grid grid-2">
+          <div class="content-grid grid-2 compact-grid">
             <div class="card slide-fade delay-2">
               <div class="card-title">最小编解码流程</div>
               <div class="arch-flow">
@@ -940,6 +971,10 @@
                   <strong>输出</strong>
                   <span>离散 token 索引序列，而不是自由连续隐向量。</span>
                 </div>
+                <div class="summary-pill">
+                  <strong>码率控制</strong>
+                  <span>在 backbone 与 loss 固定时，只通过 <code>num_quantizers</code> 构造多码率 ladder。</span>
+                </div>
               </div>
             </div>
             <div class="card slide-fade delay-3">
@@ -952,6 +987,20 @@
               </ul>
               <div class="callout" style="margin-top:16px">
                 <strong>核心直觉。</strong> 每增加一个 quantizer，系统就多一次补细节的机会。因此在保持 backbone 和 loss 不变的前提下，只改 <code>num_quantizers</code> 就能得到多码率版本。
+              </div>
+              <div class="summary-band" style="margin-top:14px;">
+                <div class="summary-pill">
+                  <strong>Frame rate</strong>
+                  <span>50 Hz</span>
+                </div>
+                <div class="summary-pill">
+                  <strong>Codebook size</strong>
+                  <span>1024</span>
+                </div>
+                <div class="summary-pill">
+                  <strong>Bitrate</strong>
+                  <span><code>0.5 × num_quantizers</code> kbps</span>
+                </div>
               </div>
             </div>
           </div>
@@ -974,7 +1023,7 @@
               本项目不是靠“把最初的基线多训一会儿”获得成功的。真正的高保真结果，来自训练目标与训练机制本身的升级。
             </div>
           </div>
-          <div class="content-grid grid-2">
+          <div class="content-grid grid-2 compact-grid">
             <div class="card slide-fade delay-2">
               <div class="card-title">系统演进</div>
               <div class="comparison">
@@ -998,6 +1047,20 @@
               </div>
               <div class="callout" style="margin-top:16px">
                 <strong>经验转折点。</strong> 系统真正从“能重建内容”跨到“高保真重建”，发生在 adversarial 训练、feature matching 与梯度配平被引入之后。
+              </div>
+              <div class="summary-band" style="margin-top:14px;">
+                <div class="summary-pill">
+                  <strong>阶段一</strong>
+                  <span>能重建内容，但听起来仍然带明显数字感。</span>
+                </div>
+                <div class="summary-pill">
+                  <strong>阶段二</strong>
+                  <span>引入更强 backbone 与量化器后，训练稳定性明显提升。</span>
+                </div>
+                <div class="summary-pill">
+                  <strong>阶段三</strong>
+                  <span>对齐 adversarial recipe 后，才真正跨过高保真门槛。</span>
+                </div>
               </div>
             </div>
             <div class="card slide-fade delay-3">
@@ -1023,6 +1086,9 @@
                   <div class="kpi-value">Adv + FM</div>
                 </div>
               </div>
+              <div class="callout" style="margin-top:14px">
+                <strong>一句话概括。</strong> 从这一步开始，模型优化的目标不再只是“波形误差更小”，而是“听起来也更自然”。
+              </div>
             </div>
           </div>
           <div class="footer-note slide-fade delay-4">
@@ -1044,42 +1110,41 @@
               benchmark 比较的是一条四点 neural bitrate ladder 与多种传统 codec，并且统一以实际压缩码率而非名义目标码率作为报告口径。
             </div>
           </div>
-          <div class="content-grid grid-3">
-            <div class="card slide-fade delay-2">
-              <div class="card-title">数据与切分</div>
-              <ul class="bullet-list">
-                <li><strong>任务域。</strong> speech only</li>
-                <li><strong>采样率。</strong> 16 kHz mono</li>
-                <li><strong>评测集。</strong> 仓库内定义的 held-out split</li>
-                <li><strong>规模。</strong> 43 条语音样本</li>
-              </ul>
-              <div class="callout" style="margin-top:18px">
-                这里的评测集不是 LibriSpeech 官方 <code>test-clean</code>，而是从 <code>clean/train.100</code> 切出的项目内 held-out split。
+          <div class="content-grid benchmark-layout">
+            <div class="stack">
+              <div class="card slide-fade delay-2">
+                <div class="card-title">实验设置</div>
+                <ul class="bullet-list">
+                  <li><strong>任务域。</strong> speech only</li>
+                  <li><strong>采样率。</strong> 16 kHz mono</li>
+                  <li><strong>评测集。</strong> 仓库内定义的 held-out split</li>
+                  <li><strong>规模。</strong> 43 条语音样本</li>
+                </ul>
+                <div class="callout" style="margin-top:14px">
+                  评测集不是 LibriSpeech 官方 <code>test-clean</code>，而是从 <code>clean/train.100</code> 切出的项目内 held-out split。
+                </div>
               </div>
-            </div>
-            <div class="card slide-fade delay-3">
-              <div class="card-title">对比对象</div>
-              <ul class="bullet-list">
-                <li><strong>Neural ladder。</strong> 12k、8k、4k、2k</li>
-                <li><strong>传统有损算法。</strong> Opus、MP3、AAC</li>
-                <li><strong>无损锚点。</strong> FLAC</li>
-              </ul>
-              <div class="chip-row">
-                <div class="chip"><b>2k</b> 4 quantizers</div>
-                <div class="chip"><b>4k</b> 8 quantizers</div>
-                <div class="chip"><b>8k</b> 16 quantizers</div>
-                <div class="chip"><b>12k</b> 24 quantizers</div>
+              <div class="card slide-fade delay-3">
+                <div class="card-title">对比与指标</div>
+                <ul class="bullet-list">
+                  <li><strong>Neural ladder。</strong> 12k、8k、4k、2k</li>
+                  <li><strong>传统算法。</strong> Opus、MP3、AAC、FLAC</li>
+                  <li><strong>核心指标。</strong> actual bitrate、ratio、STOI、LSD、MS-STFT</li>
+                </ul>
+                <div class="chip-row">
+                  <div class="chip"><b>Rule</b> 按实际码率报告</div>
+                  <div class="chip"><b>Anchor</b> FLAC 无损锚点</div>
+                  <div class="chip"><b>Check</b> 试听抽样复核</div>
+                </div>
               </div>
             </div>
             <div class="card slide-fade delay-4">
-              <div class="card-title">评测指标</div>
-              <ul class="bullet-list">
-                <li><strong>压缩成本。</strong> actual bitrate、compression ratio</li>
-                <li><strong>重建质量。</strong> STOI、LSD、multi-scale STFT</li>
-                <li><strong>主观检查。</strong> 代表性样本试听</li>
-              </ul>
-              <div class="callout" style="margin-top:18px">
-                <strong>最重要的报告规则。</strong> 我们不按目标码率下结论，而是统一按每个 codec 的 <span class="emph">actual bitrate</span> 报告结果。
+              <div class="card-title">完整 benchmark 摘要表</div>
+              <div class="figure-box" style="min-height: 520px;">
+                <img src="./assets/benchmark_full_table.svg" alt="Full benchmark summary table">
+              </div>
+              <div class="caption-line">
+                这里直接展示用于分析的全量 benchmark 表。正文报告中的代表性表格与 RD 曲线，都是从这份完整结果中抽取和概括出来的。
               </div>
             </div>
           </div>
