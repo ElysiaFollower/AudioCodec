@@ -37,7 +37,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: "SF Pro Display", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Source Han Sans SC", "Segoe UI Variable", "Segoe UI", Arial, sans-serif;
       background:
         radial-gradient(circle at 8% 12%, rgba(120, 169, 255, 0.28), transparent 28%),
         radial-gradient(circle at 82% 18%, rgba(90, 145, 255, 0.18), transparent 26%),
@@ -147,7 +147,7 @@
       line-height: 1.02;
       letter-spacing: -0.03em;
       font-weight: 760;
-      max-width: 10.5em;
+      max-width: 12.5em;
     }
 
     h1 {
@@ -155,7 +155,7 @@
     }
 
     h2 {
-      font-size: clamp(32px, 3.8vw, 54px);
+      font-size: clamp(30px, 3.5vw, 50px);
     }
 
     .headline-sub {
@@ -175,22 +175,22 @@
       gap: 16px;
       flex: 1;
       min-height: 0;
+      align-content: center;
     }
 
     .compact-grid {
-      align-items: start;
-      align-content: start;
+      align-content: center;
     }
 
     .benchmark-layout {
       grid-template-columns: 0.78fr 1.22fr;
-      align-items: stretch;
+      align-items: center;
     }
 
     .stack {
       display: grid;
       gap: 14px;
-      align-content: start;
+      align-content: center;
     }
 
     .grid-2 {
@@ -210,6 +210,7 @@
       backdrop-filter: blur(16px);
       position: relative;
       overflow: hidden;
+      width: 100%;
     }
 
     .card::after {
@@ -505,7 +506,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 210px;
+      min-height: 0;
       overflow: hidden;
     }
 
@@ -656,6 +657,7 @@
       gap: 16px;
       flex: 1;
       min-height: 0;
+      align-content: center;
     }
 
     .hero-panel {
@@ -676,7 +678,7 @@
     }
 
     .hero-diagram {
-      min-height: 340px;
+      min-height: 0;
       display: grid;
       place-items: center;
       position: relative;
@@ -684,9 +686,10 @@
 
     .domain-figure {
       position: relative;
-      width: 100%;
+      width: min(100%, 500px);
       height: 100%;
-      min-height: 340px;
+      min-height: 356px;
+      margin: 0 auto;
     }
 
     .blob {
@@ -696,19 +699,19 @@
     }
 
     .blob.general {
-      width: 334px;
-      height: 334px;
-      right: 6%;
-      top: 12px;
+      width: 366px;
+      height: 366px;
+      right: 3%;
+      top: 0;
       background: radial-gradient(circle at 32% 30%, rgba(130, 180, 255, 0.65), rgba(94, 146, 232, 0.15) 66%, rgba(94, 146, 232, 0.06) 100%);
       border: 1px solid rgba(79, 131, 218, 0.16);
     }
 
     .blob.speech {
-      width: 192px;
-      height: 192px;
-      right: 22%;
-      top: 118px;
+      width: 214px;
+      height: 214px;
+      right: 20%;
+      top: 126px;
       background: radial-gradient(circle at 32% 30%, rgba(49, 111, 235, 0.55), rgba(49, 111, 235, 0.14) 70%, rgba(49, 111, 235, 0.05) 100%);
       border: 1px solid rgba(47, 111, 235, 0.22);
     }
@@ -740,15 +743,15 @@
     }
 
     .label-general {
-      right: 2%;
-      top: 18px;
+      right: 0;
+      top: 6px;
       width: 208px;
     }
 
     .label-speech {
-      right: 23.5%;
-      top: 182px;
-      width: 144px;
+      right: 21%;
+      top: 197px;
+      width: 160px;
       text-align: center;
       background: transparent;
       border: none;
@@ -758,9 +761,9 @@
 
     .bridge-note {
       position: absolute;
-      right: 12%;
-      bottom: 40px;
-      width: 248px;
+      right: 7%;
+      bottom: 28px;
+      width: 266px;
       padding: 12px 14px;
       border-radius: 20px;
       background: rgba(255,255,255,0.88);
@@ -853,8 +856,133 @@
       .blob.speech {
         width: 148px;
         height: 148px;
-        right: 21%;
-        top: 116px;
+        right: 19%;
+        top: 110px;
+      }
+    }
+
+    @page {
+      size: 13.333in 7.5in;
+      margin: 0;
+    }
+
+    body.print-ready {
+      overflow: auto;
+      background:
+        radial-gradient(circle at 8% 12%, rgba(120, 169, 255, 0.18), transparent 28%),
+        linear-gradient(180deg, #fafdff 0%, #f4f8ff 100%);
+    }
+
+    body.print-ready::before,
+    body.print-ready .progress-track {
+      display: none !important;
+    }
+
+    body.print-ready .deck-shell,
+    body.print-ready .deck {
+      width: auto;
+      height: auto;
+      overflow: visible;
+      transform: none !important;
+    }
+
+    body.print-ready .deck {
+      display: block;
+      padding: 18px 0 28px;
+    }
+
+    body.print-ready .slide {
+      width: 13.333in;
+      height: 7.5in;
+      min-height: 0;
+      margin: 0 auto 22px;
+      padding: 40px 44px 26px;
+      overflow: hidden;
+      background: transparent;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    body.print-ready .slide:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    body.print-ready .slide-inner {
+      width: 100%;
+      height: 100%;
+    }
+
+    body.print-ready .slide-fade {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
+
+    body.print-ready .audio-btn {
+      break-inside: avoid;
+    }
+
+    @media print {
+      html, body {
+        width: auto;
+        height: auto;
+        overflow: visible;
+        background: white !important;
+      }
+
+      body {
+        overflow: visible;
+      }
+
+      body::before,
+      .progress-track {
+        display: none !important;
+      }
+
+      .deck-shell,
+      .deck {
+        width: auto;
+        height: auto;
+        overflow: visible;
+        transform: none !important;
+      }
+
+      .deck {
+        display: block;
+        padding: 0;
+      }
+
+      .slide {
+        width: 13.333in;
+        height: 7.5in;
+        min-height: 0;
+        margin: 0 auto 22px;
+        padding: 40px 44px 26px;
+        overflow: hidden;
+        background: transparent;
+        page-break-after: always;
+        break-after: page;
+      }
+
+      .slide:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+
+      .slide-inner {
+        width: 100%;
+        height: 100%;
+      }
+
+      .slide-fade {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+      }
+
+      .audio-btn {
+        break-inside: avoid;
       }
     }
   </style>
@@ -1140,8 +1268,8 @@
             </div>
             <div class="card slide-fade delay-4">
               <div class="card-title">完整 benchmark 摘要表</div>
-              <div class="figure-box" style="min-height: 520px;">
-                <img src="./assets/benchmark_full_table.svg" alt="Full benchmark summary table">
+              <div class="figure-box" style="min-height: clamp(300px, 42vh, 500px);">
+                <img src="./assets/benchmark_full_capture.png" alt="Full benchmark summary table rendered from the report">
               </div>
               <div class="caption-line">
                 这里直接展示用于分析的全量 benchmark 表。正文报告中的代表性表格与 RD 曲线，都是从这份完整结果中抽取和概括出来的。
@@ -1217,19 +1345,19 @@
                 三个传统算法的“2 kbps 目标点”最终都落在远高于 2 kbps 的实际 operating point 上。<strong>真正稳定工作在 2 kbps 附近的，只有 Neural-2k。</strong>
               </div>
               <div class="audio-grid">
-                <button class="audio-btn" data-audio="../../../evals/outputs/flac/reconstructions/1069-133709-0006.wav">
+                <button class="audio-btn" data-audio="./assets/audio/flac-1069-133709-0006.wav">
                   <div class="left"><strong>原始音频 / FLAC 锚点</strong><span>样本 1069-133709-0006</span></div>
                   <div class="play-glyph">▶</div>
                 </button>
-                <button class="audio-btn" data-audio="../../../evals/outputs/neural-2k/reconstructions/1069-133709-0006.wav">
+                <button class="audio-btn" data-audio="./assets/audio/neural-2k-1069-133709-0006.wav">
                   <div class="left"><strong>Neural-2k</strong><span>在 2.00 kbps 下仍保持很高可懂度</span></div>
                   <div class="play-glyph">▶</div>
                 </button>
-                <button class="audio-btn" data-audio="../../../evals/outputs/opus-2k/reconstructions/1069-133709-0006.wav">
+                <button class="audio-btn" data-audio="./assets/audio/opus-2k-1069-133709-0006.wav">
                   <div class="left"><strong>Opus-2k 目标点</strong><span>实际约 5.45 kbps</span></div>
                   <div class="play-glyph">▶</div>
                 </button>
-                <button class="audio-btn" data-audio="../../../evals/outputs/mp3-2k/reconstructions/1069-133709-0006.wav">
+                <button class="audio-btn" data-audio="./assets/audio/mp3-2k-1069-133709-0006.wav">
                   <div class="left"><strong>MP3-2k 目标点</strong><span>实际约 8.18 kbps</span></div>
                   <div class="play-glyph">▶</div>
                 </button>
@@ -1237,8 +1365,8 @@
             </div>
             <div class="card slide-fade delay-3">
               <div class="card-title">Rate–Distortion 视角</div>
-              <div class="figure-box" style="min-height:190px">
-                <img src="../assets/rd_stoi.svg" alt="Rate distortion STOI figure">
+              <div class="figure-box" style="min-height: clamp(150px, 24vh, 220px);">
+                <img src="./assets/images/rd_stoi.svg" alt="Rate distortion STOI figure">
               </div>
               <ul class="bullet-list" style="margin-top:16px">
                 <li><strong>超低码率区间。</strong> Neural codec 的优势最明确地出现在真正的 2 kbps 端点。</li>
@@ -1272,8 +1400,8 @@
           <div class="content-grid grid-2">
             <div class="card slide-fade delay-2">
               <div class="card-title">案例分析</div>
-              <div class="figure-box" style="min-height: 286px;">
-                <img class="case-figure" src="../assets/case_timbre_drift.svg" alt="Case study figure for timbre drift">
+              <div class="figure-box" style="min-height: clamp(250px, 36vh, 380px);">
+                <img class="case-figure" src="./assets/images/case_timbre_drift.svg" alt="Case study figure for timbre drift">
               </div>
               <div class="caption-line">
                 与整句频谱相比，并排的局部窗口更有启发性。右侧的 <strong>absolute log-spectral difference</strong> 能把局部 drift 更清楚地显示出来。
@@ -1287,11 +1415,11 @@
                 <li><strong>真正暴露问题的是局部差异。</strong> log-spectral difference 把可听见的 timbre drift 对应到了局部误差上。</li>
               </ul>
               <div class="audio-grid">
-                <button class="audio-btn" data-audio="../../../evals/outputs/flac/reconstructions/1069-133709-0005.wav">
+                <button class="audio-btn" data-audio="./assets/audio/flac-1069-133709-0005.wav">
                   <div class="left"><strong>漂移样本原音</strong><span>1069-133709-0005</span></div>
                   <div class="play-glyph">▶</div>
                 </button>
-                <button class="audio-btn" data-audio="../../../evals/outputs/neural-2k/reconstructions/1069-133709-0005.wav">
+                <button class="audio-btn" data-audio="./assets/audio/neural-2k-1069-133709-0005.wav">
                   <div class="left"><strong>Neural-2k 重建</strong><span>约 2–3 s 和 6–7 s 出现 timbre drift</span></div>
                   <div class="play-glyph">▶</div>
                 </button>
@@ -1320,8 +1448,16 @@
     const slides = Array.from(document.querySelectorAll('.slide'));
     const progressBar = document.getElementById('progressBar');
     const globalAudio = document.getElementById('globalAudio');
-    let index = 0;
+    const params = new URLSearchParams(window.location.search);
+    const printReady = params.get('print') === '1';
+    const requestedSlide = Number.parseInt(params.get('slide') || '1', 10);
+    let index = Number.isFinite(requestedSlide) ? Math.max(0, Math.min(slides.length - 1, requestedSlide - 1)) : 0;
     let wheelLocked = false;
+
+    if (printReady) {
+      document.body.classList.add('print-ready');
+      slides.forEach((slide) => slide.classList.add('active'));
+    }
 
     function updateSlides() {
       deck.style.transform = `translateX(-${index * 100}%)`;
@@ -1337,6 +1473,7 @@
     }
 
     document.addEventListener('keydown', (event) => {
+      if (printReady) return;
       if (["ArrowRight", "PageDown", " "].includes(event.key)) {
         event.preventDefault();
         goTo(index + 1);
@@ -1353,6 +1490,7 @@
     });
 
     document.addEventListener('wheel', (event) => {
+      if (printReady) return;
       if (wheelLocked) return;
       if (Math.abs(event.deltaY) < 18) return;
       wheelLocked = true;
@@ -1363,10 +1501,12 @@
 
     let touchStartX = 0;
     document.addEventListener('touchstart', (event) => {
+      if (printReady) return;
       touchStartX = event.changedTouches[0].clientX;
     }, { passive: true });
 
     document.addEventListener('touchend', (event) => {
+      if (printReady) return;
       const dx = event.changedTouches[0].clientX - touchStartX;
       if (Math.abs(dx) < 40) return;
       if (dx < 0) goTo(index + 1);
@@ -1393,7 +1533,11 @@
       document.querySelectorAll('.audio-btn .play-glyph').forEach(el => el.textContent = '▶');
     });
 
-    updateSlides();
+    if (!printReady) {
+      updateSlides();
+    } else {
+      progressBar.style.width = '100%';
+    }
   </script>
 </body>
 </html>
