@@ -24,3 +24,5 @@ evals/outputs/
 
 docs/report/*.pdf
 docs/report/slides/*.pdf
+
+.playwright-cli/

@@ -6,7 +6,7 @@ Last reviewed: 2026-04-15
 
 本仓库用于推进一个面向 `speech` 的神经音频编解码项目。
 
-- 当前目标：在课程项目约束下，先完成一个 `Encoder-Decoder + RVQ` 的 speech neural codec baseline，并与 `MP3` 做压缩率和重建质量对比。
+- 当前目标：在项目约束下，先完成一个 `Encoder-Decoder + RVQ` 的 speech neural codec baseline，并与 `MP3` 做压缩率和重建质量对比。
 
 建议先读：
 
