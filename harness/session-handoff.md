@@ -11,7 +11,7 @@ Last reviewed: 2026-05-05
 - 已有提交：`11e4bf3 docs: add context modeling research intake`
 - 已有提交：`9faade8 docs: define context modeling experiment plan`
 - 已有提交：`267c771 docs: clarify temporal context insertion semantics`
-- 当前待提交目标：long-context 研究尺度修正，避免把小窗口卷积/TCN 收益误当成长程冗余收益。
+- 当前待提交目标：正式更新研究主题，明确 local temporal modeling 是 baseline，当前研究 long-range redundancy 的存在性、层级归因和收益归因。
 - 本轮新增/修改范围：
   - modified: `docs/idea.md`
   - modified: `docs/research/context-modeling-experiment-plan.md`
@@ -23,6 +23,7 @@ Last reviewed: 2026-05-05
   - modified: `harness/session-handoff.md`
 - Commit 3 review patch：用户指出“插入时间序列建模”的工程定义不够清楚，已在实验计划中补强定义。
 - Long-context review patch：用户明确真正目标不是小窗口卷积替换成 Mamba，而是更大时间窗口甚至整段长音频的时间冗余；已更新 idea 和实验计划。
+- Theme reset patch：用户要求重新定主题，避免把已有行业共识当创新点；已更新 source-of-truth 文档。
 
 ## 当前已验证状态
 
@@ -49,6 +50,8 @@ Last reviewed: 2026-05-05
 - 补强 `docs/research/context-modeling-experiment-plan.md` 中“什么叫插入时间序列建模”：定义为固定表示边界上的同形状 residual `TemporalMixer: [B, C, T] -> [B, C, T]`，并明确 latent pre-RVQ、post-RVQ embedding、code prior、early feature 四类插入的数据流语义。
 - 补强 `docs/idea.md` 和 `docs/research/context-modeling-experiment-plan.md` 的研究尺度：local context 只是控制组；主要研究 medium/long/full utterance context，并要求记录 `context_scope`、`context_window_seconds`、`context_window_frames`。
 - 明确当前 `train_clip_seconds=2.0` 只能做 sanity，正式长程冗余实验需要 10-30 秒或 full utterance manifest / metadata。
+- 更新 `docs/idea.md`、`docs/overview.md`、`README.md`、ADR 0002 和 TASK-008：局部时序建模已是 baseline；当前研究 long-range temporal redundancy 的存在性、层级归因和收益归因。
+- 更新 `docs/research/context-modeling-experiment-plan.md`：E0-E2 是 go/no-go diagnostics，只有 medium/long/full utterance 相比 local 有额外收益时，才进入 E3-E5 codec context 训练。
 - 明确当前 SEANet baseline 已带 `SkipLSTM`，后续实验不能把 baseline 自带 LSTM 当成新增 context 收益。
 - 修正 `evals/README.md` 中传统 codec benchmark 手册链接到 `docs/archive/course-project/how-to/run-traditional-codec-benchmark.md`。
 - 使用 `harness-project-initializer-zh` scaffold 补齐缺失的 harness 工件，并替换全部 scaffold 占位符。
@@ -66,7 +69,7 @@ Last reviewed: 2026-05-05
 - `AGENTS.md` 只保留入口、事实来源、硬规则、验证阶梯和完成定义；专题细节放入 docs、harness、plans 或脚本。
 - 当前唯一 active feature 是 `phase-1-research-intake-and-experiment-prep`。
 - 一阶段先围绕 `docs/idea.md` 做研究收集和实验准备；不直接实现 Mamba-only codec 或固定 latent/code-level context。
-- Commit 4 不直接实现 Mamba；先实现 representation export 和 result schema，保证后续 code-prior / latent context / post-RVQ context 共享同一结果采集路径，并支持长片段 / full utterance metadata。
+- Commit 4 不直接实现 Mamba；先实现 representation export 和 result schema，保证 E0-E2 go/no-go diagnostics 有长片段 / full utterance metadata。
 - 后续如果 agent 忘记更新状态文件，应优先增强 `scripts/harness-check.sh`，而不是继续往 `AGENTS.md` 堆规则。
 
 ## 仍损坏或未验证
@@ -90,7 +93,7 @@ Last reviewed: 2026-05-05
 
 ## 下一步最佳动作
 
-等待用户审查 long-context 方向。若确认对齐，下一步进入 Commit 4：实现 representation export 和 result schema，支持长片段 / full utterance metadata，不训练新模型、不引入 Mamba 依赖。
+等待用户审查更新后的主题。若确认对齐，下一步进入 Commit 4：实现 representation export 和 result schema，支持长片段 / full utterance metadata，用于 E0-E2 go/no-go diagnostics；不训练新模型、不引入 Mamba 依赖。
 
 ## 命令
 

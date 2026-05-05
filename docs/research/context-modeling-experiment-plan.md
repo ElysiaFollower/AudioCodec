@@ -8,8 +8,8 @@ Last reviewed: 2026-05-05
 
 本文档把 `docs/idea.md` 和 `docs/research/context-modeling-intake.md` 细化到实现层。目标不是一次性跑完论文矩阵，而是让下一阶段代码实现能稳定回答三个问题：
 
-1. 时间冗余在哪些表示层可测；
-2. 哪些层级的大时间窗口上下文建模能转成 codec 收益；
+1. 局部上下文之外的长程时间冗余是否仍然可测；
+2. 哪些表示层级的大时间窗口上下文建模能转成 codec 收益；
 3. Mamba 是否比 matched TCN / LSTM / Transformer 更值得用。
 
 ## 当前工程事实
@@ -185,6 +185,8 @@ waveform -> encoder_prefix -> early_feature -> TemporalMixer(early_feature) -> e
 ## 最小实验矩阵
 
 第一轮只用 `configs/ablation-adversarial-msstft-balanced-4kbps.json` 作为主实现锚点。代码稳定后再复制到 `2 / 8 / 12 kbps` ladder。
+
+第一轮必须先完成 `E0-E2` 的 go/no-go diagnostics。只有当 medium/long/full utterance 相比 local window 有额外 predictability 或 entropy 收益时，才进入 `E3-E5` 的 codec context 训练。
 
 | 阶段 | 目的 | 插入层级 | 模型族 / baseline | 主要输出 | 是否训练 codec |
 | --- | --- | --- | --- | --- | --- |

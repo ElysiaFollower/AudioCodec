@@ -6,7 +6,7 @@ Last reviewed: 2026-05-05
 
 本仓库用于推进一个面向 `speech` 的 neural codec / speech tokenizer 科研项目。
 
-- 当前科研目标：研究在 `waveform -> downsampled latent -> RVQ embedding/codes -> code sequence/prior` 这条表示链上，大时间窗口上下文序列建模应在哪一层介入，才能把普通局部卷积尚未利用的长程时间冗余转化为同码率质量收益、entropy-coded bitrate 收益或长音频 token modeling 效率收益。
+- 当前科研目标：研究 neural speech codec 已经具备局部时序建模后，语音中是否仍存在可利用的长程时间冗余；如果存在，它在 `waveform -> downsampled latent -> RVQ embedding/codes -> code sequence/prior` 哪个表示层级最容易转化为同码率质量收益、entropy-coded bitrate 收益或长音频 token modeling 效率收益。
 - 当前工程基底：已经完成 `SEANet + EMA RVQ` speech codec baseline，并已有 `2 / 4 / 8 / 12 kbps` neural ladder 与传统 codec benchmark。
 - 当前方法立场：Mamba 是 selective SSM 候选模型，不是唯一假设；后续实验必须同时比较 `TCN / LSTM / Transformer / Mamba` 等上下文模型。
 - 当前阶段：一阶段先调研并收集 idea 相关研究与代码，整理证据和实验准备，再进入开发实现。
@@ -74,6 +74,7 @@ python scripts/train_codec.py --dataset-root /path/to/LibriSpeech/dev-clean --sm
 
 - 不把 Mamba 收益和上下文建模收益混为一谈。
 - 不把小窗口卷积/TCN 收益包装成长程时间冗余收益。
+- 不把“局部时间建模”当成创新点；它是 baseline。
 - 不把 nominal bitrate、entropy-coded bitrate 和 tokens/sec 混为一谈。
 - 不在没有 matched baseline 的情况下宣称模型优越性。
 - 不让 post-RVQ refiner 引入额外 side channel；传输 payload 仍只能是 RVQ codes。

@@ -2,7 +2,7 @@ Owner: ely
 Status: accepted
 Last reviewed: 2026-05-05
 
-# ADR 0002: 围绕上下文插入位置定义科研问题
+# ADR 0002: 围绕长程时间冗余定义科研问题
 
 ## 背景
 
@@ -14,7 +14,7 @@ Last reviewed: 2026-05-05
 
 当前科研 idea 定义为：
 
-> 研究时间上下文建模应该在哪个 neural speech codec 表示层级进入。
+> 研究 neural speech codec 在已经具备局部时序建模的前提下，是否仍存在可利用的长程时间冗余；如果存在，这种长程冗余应该在哪个表示层级利用，才能转化为真实收益。
 
 表示链是：
 
@@ -22,16 +22,19 @@ Last reviewed: 2026-05-05
 waveform -> downsampled latent -> RVQ embedding/codes -> code prior
 ```
 
-项目必须显式比较两个假设：
+项目必须显式比较三个问题：
 
-- **早期上下文假设**：上下文应该靠近 waveform 进入，因为时间冗余在量化前最明显、信息也最完整。
-- **后期上下文假设**：上下文在 downsampled latent 或 quantized codes 上更有用，因为序列更短、更结构化，也更接近 bitrate 或 entropy 收益。
+- **存在性问题**：局部卷积 / TCN / baseline LSTM 已经利用短程上下文后，medium / long / full utterance 级别的额外冗余是否仍然可测。
+- **层级归因问题**：如果长程冗余存在，它在 early feature、downsampled latent、post-RVQ embedding、RVQ codes / code prior 哪一层最容易转化为收益。
+- **收益归因问题**：这种收益到底是 reconstruction fidelity、rate-distortion、entropy bitrate、token efficiency，还是 long-context / streaming efficiency。
 
-Mamba 是候选上下文模型，不是整个科研 idea。
+Local temporal modeling 是 baseline，不是贡献。Mamba 是候选长程上下文模型，不是整个科研 idea。
 
 ## 影响
 
-实现计划、插入点和模型变体都是次级内容。它们必须服务于上面的假设对比。
+实现计划、插入点和模型变体都是次级内容。它们必须服务于上面的存在性、层级归因和收益归因。
+
+后续实验不得把小窗口卷积 / TCN 收益包装成长程时间冗余收益。`full utterance` 只能作为 offline upper bound；如果要写 streaming claim，必须使用 causal past context。
 
 当前 idea 的 source of truth 是：
 

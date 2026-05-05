@@ -59,3 +59,6 @@ Last reviewed: 2026-05-05
 - 已补强 `docs/research/context-modeling-experiment-plan.md`：把插入定义为固定表示边界上的同形状 residual `TemporalMixer: [B, C, T] -> [B, C, T]`，并分别定义 latent pre-RVQ、post-RVQ embedding、code prior 和 early feature 的前后数据流、允许收益和禁止混淆项。
 - 用户进一步明确：如果只是把局部卷积感受野换成 Mamba，没有研究价值；真正目标是更大时间窗口甚至整段长音频的时间冗余。
 - 已更新 `docs/idea.md` 和 `docs/research/context-modeling-experiment-plan.md`：local conv/TCN 只作为控制组，主问题收窄为 medium/long/full utterance context；正式实验必须记录 `context_scope`、`context_window_seconds`、`context_window_frames`，并避免把 2 秒 clip sanity 写成长程结论。
+- 用户要求重新定主题：局部 temporal modeling 已经是行业共识，项目不能把“加上下文”当创新点。
+- 已更新 `docs/idea.md`、`docs/overview.md`、`README.md`、ADR 0002、TASK-008 和实验计划：当前主题是 neural speech codec 已有局部时序建模后，长程时间冗余是否仍存在；如果存在，它在哪个表示层级最容易转化为 fidelity / RD / entropy / token / efficiency 收益。
+- 实验计划已明确 E0-E2 是 go/no-go diagnostics；如果 long/full context 相比 local 没有额外 predictability 或 entropy 收益，应停止或转向，而不是直接实现 Mamba codec。

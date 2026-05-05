@@ -8,13 +8,15 @@ Last reviewed: 2026-05-05
 
 本项目研究：
 
-> 在 neural speech codec 中，应该在哪个表示层级引入大时间窗口的上下文建模，才能把语音中的长程时间冗余真正转化为压缩收益或保真率收益？
+> Neural speech codec 已经通过卷积、LSTM 或局部 block 利用了短程时序上下文之后，语音中是否仍存在可利用的长程时间冗余？如果存在，它应该在哪个表示层级被利用，才能转化为真实压缩收益或保真率收益？
 
 换句话说：
 
 > 大时间窗口上下文建模是应该尽早进入 waveform / early feature 层，在信息被量化丢失前利用跨秒级甚至整段语音的冗余；还是应该等 codec 把 waveform 转成更短、更结构化的 latent / code 序列后再进入？
 
 这就是当前 idea。其他内容都是围绕这个 idea 设计证据。
+
+因此，本项目不再把“给 codec 加时间上下文”当作创新点。局部时间建模是现有 neural codec 的基本能力，也是本项目的 baseline。
 
 ## 2. 这个想法从哪里来
 
@@ -32,9 +34,11 @@ Last reviewed: 2026-05-05
 
 ## 3. 真正的研究张力
 
-困难点不在于“要不要上下文建模”，而在于：
+困难点不在于“要不要上下文建模”。这已经是行业共识。
 
-> 上下文应该在哪一层进入？
+真正的问题是：
+
+> 局部上下文已经存在之后，长程冗余是否还存在？如果存在，它应该在哪一层进入，才能变成收益？
 
 这里存在两个互相竞争的假设。
 
@@ -73,9 +77,11 @@ Last reviewed: 2026-05-05
 
 本项目不应预设假设 A 或假设 B 哪个正确。
 
-核心问题是：
+核心问题是三层：
 
-> 沿着 `waveform -> downsampled latent -> RVQ embedding/codes -> code prior` 这条表示链，大窗口上下文建模在哪一层产生最强收益？这种收益到底是哪一种收益？
+1. **存在性**：超过 local window 之后，latent / RVQ embedding / RVQ codes 是否还有可预测性提升？
+2. **层级归因**：沿着 `waveform -> downsampled latent -> RVQ embedding/codes -> code prior` 这条表示链，长程上下文在哪一层产生最强收益？
+3. **收益归因**：这种收益到底是哪一种收益？
 
 可能的收益至少有五类：
 
@@ -86,6 +92,8 @@ Last reviewed: 2026-05-05
 - **效率收益**：质量接近时，memory、latency 或 streaming 能力更好。
 
 这些收益不能都混成一句“提高压缩率”。
+
+下一步应先做 go/no-go diagnostics：比较 local、medium、long、full utterance 上下文下的 latent predictability 和 code entropy。如果 long/full context 相比 local 没有显著额外收益，项目应停止或转向，而不是直接实现 Mamba codec。
 
 ## 7. Mamba 在这里扮演什么角色
 
@@ -101,9 +109,10 @@ Mamba 是实现上下文建模的一类候选模型。它对应的是第二层�
 
 所以项目有两层问题：
 
-1. **位置问题**：大窗口上下文建模应该在哪一层进入 codec？
-2. **尺度问题**：收益来自局部几帧，还是来自数秒到整段语音的长程上下文？
-3. **模型族问题**：在大窗口上下文建模有效的位置，Mamba 是否比 Transformer / LSTM / TCN 更值得用？
+1. **存在性问题**：local context 之外是否还有可利用长程冗余？
+2. **位置问题**：大窗口上下文建模应该在哪一层进入 codec？
+3. **尺度问题**：收益来自局部几帧，还是来自数秒到整段语音的长程上下文？
+4. **模型族问题**：在大窗口上下文建模有效的位置，Mamba 是否比 Transformer / LSTM / TCN 更值得用？
 
 如果 Mamba 在质量上没有超过 Transformer，但在长音频或流式推理中显著更省内存、更低延迟，这仍然可能是有价值的结果。
 
