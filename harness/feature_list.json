@@ -1,0 +1,91 @@
+{
+  "owner": "ely",
+  "last_reviewed": "2026-05-05",
+  "wip_limit": 1,
+  "features": [
+    {
+      "id": "research-repositioning-docs",
+      "priority": "P0",
+      "area": "docs/research",
+      "title": "用中文定义 AudioCodec 的时间冗余与上下文建模科研想法",
+      "behavior": "新读者可以从 docs/idea.md、docs/overview.md 和 ADR 0002 理解当前研究问题、竞争假设、Mamba 的角色以及旧课程材料为何只作归档参考。",
+      "status": "passing",
+      "verification": [
+        "git diff --check",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v"
+      ],
+      "evidence": [
+        "docs/idea.md 用中文记录核心 idea、early/later context 竞争假设和 Mamba 的候选角色",
+        "docs/overview.md 指向 docs/idea.md，而不是把 idea 淹没在实现细节里",
+        "docs/adr/0002-temporal-redundancy-research-scope.md 记录当前科研范围决策",
+        "docs/architecture/current-codec-baseline.md 记录当前稳定 codec baseline",
+        "旧课程资料和过度具体的第一版草稿已归档到 docs/archive/",
+        "git diff --check passed",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 25 tests OK"
+      ],
+      "notes": "这是当前科研定位的长期入口。后续如果 idea 改变，应先改 docs/idea.md 和 ADR，再改实现。"
+    },
+    {
+      "id": "speech-rvq-codec-baseline",
+      "priority": "P0",
+      "area": "src/evals/docs",
+      "title": "保持 speech SEANet + EMA RVQ codec baseline 可作为实验基底",
+      "behavior": "仓库提供稳定的 speech codec 表示链：waveform -> SEANet encoder -> downsampled latent -> EMA RVQ -> codes/embedding -> SEANet decoder，并保留 2/4/8/12 kbps anchor 与传统 codec benchmark 脚本。",
+      "status": "passing",
+      "verification": [
+        "PYTHONPATH=src python scripts/train_codec.py --help",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v"
+      ],
+      "evidence": [
+        "docs/architecture/current-codec-baseline.md 记录 baseline 数据流、frame rate、RVQ accounting 和保持不变的变量",
+        "configs/ablation-adversarial-msstft-balanced*.json 保留 2/4/8/12 kbps anchor",
+        "evals/scripts/ 保留传统 codec benchmark、导出和评分脚本",
+        "上次验证：conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 25 tests OK"
+      ],
+      "notes": "一阶段不把 frame rate、codebook size、front-end、side-channel 或训练 recipe 与上下文建模核心变量混在一起。"
+    },
+    {
+      "id": "repo-native-harness-refresh",
+      "priority": "P0",
+      "area": "harness",
+      "title": "让 agent 能自主维护文档、进度和交接状态",
+      "behavior": "AGENTS.md 作为短路由入口，init.sh 和 scripts/harness-check.sh 提供启动与门禁，harness 文档记录 feature list、progress、decisions、observability、quality、rubric 和 session handoff。",
+      "status": "passing",
+      "verification": [
+        "./scripts/harness-check.sh",
+        "./init.sh",
+        "git diff --check",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v"
+      ],
+      "evidence": [
+        "AGENTS.md 已重写为 74 行短路由，包含元数据、事实来源地图、启动流程、硬性规则、验证阶梯和完成定义",
+        "init.sh 可执行，并能打印当前阶段、入口文档和验证命令",
+        "scripts/harness-check.sh 检查 AGENTS 长度、硬规则数量、占位符、feature schema、WIP=1 和 passing evidence",
+        "harness/bootstrap-contract.md、decisions.md、observability.md、evaluator-rubric.md、quality.md 已用项目事实替换 scaffold 占位符",
+        "feature_list.json 当前唯一 active item 是 phase-1-research-intake-and-experiment-prep",
+        "./scripts/harness-check.sh passed: 0 warnings",
+        "./init.sh passed and printed recovery commands",
+        "git diff --check passed",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help passed",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 25 tests OK"
+      ],
+      "notes": "后续任务结束前必须更新 progress、feature_list 和 session-handoff；若 agent 再次遗漏，优先增强 harness-check。"
+    },
+    {
+      "id": "phase-1-research-intake-and-experiment-prep",
+      "priority": "P0",
+      "area": "docs/plans/evals",
+      "title": "一阶段收集 idea 相关研究并准备开发实验",
+      "behavior": "围绕 docs/idea.md 收集 neural speech codec、RVQ/tokenizer、context modeling、entropy coding 和 Mamba/SSM 相关研究与代码，把证据映射到 early context、latent context、post-RVQ context 和 code-prior context，并产出可执行的实验准备清单。",
+      "status": "active",
+      "verification": [
+        "./scripts/harness-check.sh",
+        "人工审查研究收集产物是否覆盖 idea 中的竞争假设和必要 baseline",
+        "人工审查下一阶段实现计划是否列出验证命令、数据、指标和 out-of-scope"
+      ],
+      "evidence": [],
+      "notes": "当前唯一 active item。完成前不要新增并行实现任务；若必须实现支撑脚本，应先在 active plan 中收窄范围。"
+    }
+  ]
+}

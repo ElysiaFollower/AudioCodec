@@ -64,4 +64,4 @@ baseline 与 mel ablation 的比较应固定以下条件：
 - 配置文件：`configs/baseline.json`
 - 配置文件：`configs/ablation-mel-loss.json`
 - 训练入口：`scripts/train_codec.py`
-- 长期说明：`docs/how-to/train-on-linux.md`
+- 长期说明：`docs/archive/course-project/how-to/train-on-linux.md`

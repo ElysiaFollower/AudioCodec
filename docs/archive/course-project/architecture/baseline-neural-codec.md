@@ -1,8 +1,10 @@
 Owner: ely
-Status: draft
-Last reviewed: 2026-04-13
+Status: archived
+Last reviewed: 2026-05-05
 
 # 基线架构说明
+
+> 历史说明：本文档记录课程项目早期的最小 baseline 设计，不再定义 2026-05-05 之后的科研主线。当前科研主线见 [Research Idea](/Users/ely/workspace/research/audio/AudioCodec/docs/idea.md) 和 [Current Codec Baseline](/Users/ely/workspace/research/audio/AudioCodec/docs/architecture/current-codec-baseline.md)。
 
 ## 1. 设计原则
 

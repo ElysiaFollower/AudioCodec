@@ -1,8 +1,10 @@
 Owner: ely
-Status: active
-Last reviewed: 2026-04-15
+Status: archived
+Last reviewed: 2026-05-05
 
 # Linux 训练说明
+
+> Archived note: 本文档保留 baseline 与课程阶段训练操作，不再定义当前科研实施顺序。当前科研方向见 [Research Idea](/Users/ely/workspace/research/audio/AudioCodec/docs/idea.md)。
 
 ## 目标
 
@@ -247,10 +249,14 @@ tensorboard --logdir artifacts
 
 ## 当前限制
 
-当前训练脚本已经覆盖 baseline 训练所需的核心流程，但还没有内置：
+当前训练脚本已经覆盖 baseline 训练所需的核心流程，并支持 resume。传统 codec benchmark 与统一评分已经迁移到 `evals/scripts/`。
 
-- `MP3` baseline 压缩与对比
-- `PESQ` / `STOI` 等额外评测
-- 训练结束后的自动汇总报告
+仍未内置到主训练脚本中的科研评估包括：
 
-这些步骤建议在训练结果稳定后单独实现。
+- representation/code dump
+- codebook usage / entropy summary
+- code prior NLL
+- ASR WER / semantic preservation
+- RTF / peak memory / streaming latency sweep
+
+这些指标属于 `TASK-008` 后续工作，不应塞进 baseline 训练入口。

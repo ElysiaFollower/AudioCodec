@@ -1,5 +1,5 @@
-name: Course Project Task
-description: 记录课程项目中的结构化任务
+name: Research Task
+description: 记录 AudioCodec 科研任务的目标、约束和验收标准
 title: "[Task] "
 labels:
   - task
@@ -9,28 +9,28 @@ body:
     attributes:
       label: 目标
       description: 这项任务完成后，具体要交付什么？
-      placeholder: 例如：完成 speech codec baseline 的 RVQ 模块并跑通训练
+      placeholder: 例如：完成 idea 相关论文收集，并整理 context 插入层级对照表
     validations:
       required: true
   - type: textarea
     id: background
     attributes:
       label: 背景
-      description: 为什么要做这件事？它和当前里程碑的关系是什么？
+      description: 为什么要做这件事？它和当前研究阶段的关系是什么？
     validations:
       required: true
   - type: textarea
     id: constraints
     attributes:
       label: 约束
-      description: 时间、硬件、依赖、数据、风险等限制条件
+      description: 时间、硬件、依赖、数据、baseline、指标或 out-of-scope 等限制条件
     validations:
       required: true
   - type: textarea
     id: acceptance
     attributes:
       label: 验收标准
-      description: 用可观察的结果描述“完成”
+      description: 用可观察的结果描述“完成”，并写清验证命令或人工检查方式
     validations:
       required: true
   - type: textarea

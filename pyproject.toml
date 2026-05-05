@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "audiocodec"
 version = "0.1.0"
-description = "Speech neural codec baseline for the MultiMedia course project."
+description = "Speech neural codec research workspace for RVQ codec and context modeling experiments."
 requires-python = ">=3.10"
 dependencies = [
   "pystoi>=0.4.1,<1",

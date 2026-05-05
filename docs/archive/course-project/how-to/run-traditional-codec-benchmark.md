@@ -1,6 +1,6 @@
 Owner: ely
-Status: active
-Last reviewed: 2026-04-16
+Status: archived
+Last reviewed: 2026-05-05
 
 # Run Traditional Codec Benchmark
 

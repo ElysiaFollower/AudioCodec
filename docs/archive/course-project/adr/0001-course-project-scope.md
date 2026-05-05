@@ -1,6 +1,6 @@
 Owner: ely
-Status: accepted
-Last reviewed: 2026-04-13
+Status: archived
+Last reviewed: 2026-05-05
 
 # ADR 0001: 课程项目先完成 VAE/RVQ 基线
 

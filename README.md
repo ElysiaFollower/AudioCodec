@@ -1,21 +1,26 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-04-15
+Last reviewed: 2026-05-05
 
 # AudioCodec
 
-本仓库用于推进一个面向 `speech` 的神经音频编解码项目。
+本仓库用于推进一个面向 `speech` 的 neural codec / speech tokenizer 科研项目。
 
-- 当前目标：在项目约束下，先完成一个 `Encoder-Decoder + RVQ` 的 speech neural codec baseline，并与 `MP3` 做压缩率和重建质量对比。
+- 当前科研目标：研究在 `waveform -> downsampled latent -> RVQ embedding/codes -> code sequence/prior` 这条表示链上，上下文序列建模应在哪一层介入，才能把时间冗余转化为同码率质量收益、entropy-coded bitrate 收益或长音频 token modeling 效率收益。
+- 当前工程基底：已经完成 `SEANet + EMA RVQ` speech codec baseline，并已有 `2 / 4 / 8 / 12 kbps` neural ladder 与传统 codec benchmark。
+- 当前方法立场：Mamba 是 selective SSM 候选模型，不是唯一假设；后续实验必须同时比较 `TCN / LSTM / Transformer / Mamba` 等上下文模型。
+- 当前阶段：一阶段先调研并收集 idea 相关研究与代码，整理证据和实验准备，再进入开发实现。
 
-建议先读：
+建议先读当前科研主线：
 
 - [项目总览](./docs/overview.md)
-- [基线架构说明](./docs/architecture/baseline-neural-codec.md)
-- [Encodec-Inspired 架构说明](./docs/architecture/encodec-inspired-codec.md)
-- [当前执行计划](./plans/active/TASK-006-traditional-codec-benchmark.md)
-- [最新归档计划：训练对齐阶段](./plans/archive/TASK-005-encodec-training-alignment.md)
-- [范围决策 ADR](./docs/adr/0001-course-project-scope.md)
+- [研究想法](./docs/idea.md)
+- [ADR 0002：围绕上下文插入位置定义科研问题](./docs/adr/0002-temporal-redundancy-research-scope.md)
+- [当前 codec baseline](./docs/architecture/current-codec-baseline.md)
+- [当前执行计划](./plans/active/TASK-008-context-sequence-modeling-research.md)
+- [Harness 交接](./harness/session-handoff.md)
+
+历史 baseline、课程报告与旧 benchmark 资料已经归档到 [docs/archive](./docs/archive/README.md)，不再定义当前设计。
 
 ## 环境安装
 
@@ -50,16 +55,26 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 python scripts/train_codec.py --dataset-root /path/to/LibriSpeech/dev-clean --smoke-test
 ```
 
-## 当前实验配置
+## 当前科研 Anchor
 
-- `configs/baseline.json`
-  轻量 `Conv + RVQ + Conv` baseline，主要用于最小可交付和消融。
-- `configs/ablation-mel-loss.json`
-  在 baseline 上打开 `mel loss` 的对照实验。
-- `configs/encodec-inspired.json`
-  当前主力路线，使用 `SEANet + EMA RVQ`，目标是把音质提升到可用级别。
 - `configs/ablation-adversarial-msstft-balanced.json`
-  当前已验证可用的高保真训练路线，使用 `MS-STFT discriminator + feature matching + balancer`。
+  `12 kbps` baseline anchor，使用 `SEANet + EMA RVQ + MS-STFT discriminator + feature matching + balancer`。
+- `configs/ablation-adversarial-msstft-balanced-8kbps.json`
+  `8 kbps` baseline anchor。
+- `configs/ablation-adversarial-msstft-balanced-4kbps.json`
+  `4 kbps` baseline anchor。
+- `configs/ablation-adversarial-msstft-balanced-2kbps.json`
+  `2 kbps` baseline anchor。
+
+历史课程阶段配置，例如 `configs/baseline.json`、`configs/ablation-mel-loss.json` 和 `configs/encodec-inspired.json`，仍保留在仓库中用于复现，但它们不是当前科研计划的起点。
+
+## 当前研究纪律
+
+- 不把 Mamba 收益和上下文建模收益混为一谈。
+- 不把 nominal bitrate、entropy-coded bitrate 和 tokens/sec 混为一谈。
+- 不在没有 matched baseline 的情况下宣称模型优越性。
+- 不让 post-RVQ refiner 引入额外 side channel；传输 payload 仍只能是 RVQ codes。
+- 不预设 latent/code-level context 一定优于 waveform-level context；早期上下文是否更好是要被验证的核心假设之一。
 
 ## 评测目录
 
