@@ -99,9 +99,12 @@
         "docs/research/long-range-redundancy-intake.md 补充 long-range Transformer speech coding、codec-token language modeling、time-invariant/multi-scale/low-frame-rate tokenizer、TFC/CodecSlime dynamic frame-rate 路线和通用化阻碍",
         "docs/research/context-modeling-intake.md、context-modeling-attempt-log.md、context-modeling-blockers.md 已同步新增 Single-Codec、TFC、CodecSlime 等更贴近 temporal redundancy 的材料",
         "plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md 替换旧 context sequence modeling plan，按 phase 区分实现任务和实验任务",
-        "README.md 和 init.sh 已指向新的 active spec"
+        "README.md 和 init.sh 已指向新的 active spec",
+        "evals/scripts/export_neural_codec.py 已支持 --save-representations，导出 codes / latent / quantized / reconstruction 并写入 Phase 1 schema metadata",
+        "tests/test_evals_scripts.py 覆盖 context window metadata、manifest row schema 和临时 checkpoint/audio 的 representation export integration sanity",
+        "evals/README.md 已记录 Phase 1 representation export 命令和短样本 sanity 边界"
       ],
-      "notes": "当前唯一 active item。下一步从 Phase 1 开始实现 representation export、long/full utterance manifest metadata 和 result schema；不直接实现 Mamba codec 或 dynamic frame-rate redesign。"
+      "notes": "当前唯一 active item。Phase 1 representation export 已实现；下一步用可访问的 long/full utterance manifest 和 4kbps checkpoint 跑真实 export sanity，再进入 Phase 2 diagnostics。"
     }
   ]
 }

@@ -1,6 +1,6 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-04-15
+Last reviewed: 2026-05-05
 
 # Evals
 
@@ -30,6 +30,22 @@ evals/
    - 支持 `bitrate` mode：统一 target bitrate sweep
    - 支持 `default` mode：不人工指定码率，观察 codec-native operating point
 4. 用 `evals/scripts/score_outputs.py` 统一计算压缩率和重建质量指标
+
+长程时间冗余 Phase 1 representation export 在 neural export 基础上增加：
+
+```bash
+PYTHONPATH=src python evals/scripts/export_neural_codec.py \
+  --manifest evals/data/manifests/test.jsonl \
+  --checkpoint /path/to/checkpoint.pt \
+  --output-dir evals/outputs/context-modeling/neural-4k-export \
+  --codec-label neural-4k \
+  --device auto \
+  --save-representations \
+  --context-scope full_utterance \
+  --is-full-utterance
+```
+
+该模式会在 `manifest.jsonl` 中记录 `latent_path`、`quantized_path`、`codes_path`、`context_scope`、`context_window_seconds`、`context_window_frames`、`frame_rate`、`hop_length`、`nominal_bitrate_kbps` 和 `rvq_payload_bits` 等字段。短样本 sanity 不能写成长程结论。
 
 完整命令见：
 

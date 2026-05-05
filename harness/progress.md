@@ -84,3 +84,17 @@ Last reviewed: 2026-05-05
   - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，25 tests OK。
+- Phase 1 representation export 实现完成：
+  - `evals/scripts/export_neural_codec.py` 新增 `--save-representations`，一次 forward 导出 `codes / latent / quantized / reconstruction`；
+  - `manifest.jsonl` 新增 `schema_version`、`latent_path`、`quantized_path`、`frame_rate`、`hop_length`、`latent_dim`、`nominal_bitrate_kbps`、`rvq_payload_bits`、`context_scope`、`context_window_seconds`、`context_window_frames`、`clip_scope`、`is_full_utterance` 等字段；
+  - `run.json` 新增 Phase 1 schema、frame/RVQ metadata、context metadata 和 representation kinds；
+  - `--save-codes` 旧行为保留；`--save-representations` 会把三类 tensor 放到 `representations/`。
+- 新增 `tests/test_evals_scripts.py` focused coverage：context window 解析、manifest row schema、临时 checkpoint/audio 的 representation export integration sanity。
+- 更新 `evals/README.md` 记录 Phase 1 representation export 命令，并强调短样本 sanity 不能写成长程结论。
+- 本轮 Phase 1 验证：
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/export_neural_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，10 tests OK。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，29 tests OK。

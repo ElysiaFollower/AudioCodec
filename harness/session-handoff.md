@@ -15,78 +15,73 @@ Last reviewed: 2026-05-05
   - `b57556e docs: refocus context modeling on long-range redundancy`
   - `705a275 docs: define long-range redundancy research theme`
   - `51a8b09 docs: add long-range redundancy research refresh`
-- 当前待提交目标：创建新的 active implementation spec，替换旧的 context sequence modeling research plan，并把后续工作收束到 long-range redundancy diagnostics 路线。
+  - `bf45862 docs: define long-range redundancy implementation spec`
+- 当前待提交目标：实现 Phase 1 representation export 和结果 schema，支撑后续 E0-E2 long-range redundancy diagnostics。
 - 本轮新增/修改范围：
-  - added: `plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md`
-  - deleted: `plans/active/TASK-008-context-sequence-modeling-research.md`
-  - modified: `README.md`
+  - modified: `evals/scripts/export_neural_codec.py`
+  - modified: `tests/test_evals_scripts.py`
+  - modified: `evals/README.md`
   - modified: `init.sh`
-  - modified: `docs/archive/course-project/report/README.md`
-  - modified: `harness/bootstrap-contract.md`
+  - modified: `plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md`
   - modified: `harness/feature_list.json`
   - modified: `harness/progress.md`
-  - modified: `harness/quality.md`
   - modified: `harness/session-handoff.md`
 
 ## 当前已验证状态
 
-- `./init.sh`
-  - 结果：通过，能打印新的 active spec 路径 `plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md`。
 - `./scripts/harness-check.sh`
   - 结果：通过，`Harness 检查通过，共 0 个警告。`
 - `git diff --check`
   - 结果：通过。
-- `python3 -m json.tool harness/feature_list.json >/dev/null`
+- `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/export_neural_codec.py --help`
   - 结果：通过。
+- `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v`
+  - 结果：通过，`Ran 10 tests`, `OK`。
 - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help`
   - 结果：通过，能打印训练 CLI 参数。
 - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v`
-  - 结果：通过，`Ran 25 tests`, `OK`。
+  - 结果：通过，`Ran 29 tests`, `OK`。
 
 ## 本会话改动
 
-- 用 `plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md` 替换旧 active plan，保留 `TASK-008` 编号和 WIP=1。
-- 新 spec 明确当前主线：先做 fixed-frame `SEANet + EMA RVQ` baseline 的 `E0-E2` go/no-go diagnostics，再决定是否进入 codec context training。
-- 新 spec 按 phase 区分 **实现任务** 和 **实验任务**：
-  - Phase 1：representation export 与结果 schema；
-  - Phase 2：frozen representation redundancy diagnostics；
-  - Phase 3：code-prior entropy baseline；
-  - Phase 4：latent pre-RVQ context；
-  - Phase 5：post-RVQ embedding context；
-  - Phase 6：条件引入 Mamba / SSM 与 early feature；
-  - Conditional Branch：dynamic / variable frame-rate。
-- 写入默认 gate：long/full context 相比最佳 local baseline 至少带来 `>=5%` estimated entropy bitrate 或 predictability improvement，才进入 codec context training。
-- 将 dynamic / variable frame-rate 定义为条件分支；只有 diagnostics 显示收益集中在静音、长元音或 steady-state segment 时另开任务，不混入 fixed-frame context 主线。
-- 同步 README、`init.sh`、归档报告链接、feature list、bootstrap contract、quality 和 progress 的 active spec 路由。
+- `evals/scripts/export_neural_codec.py` 新增 `--save-representations`，一次 model forward 导出 `codes`、`latent`、`quantized` 和 reconstruction。
+- 保留旧 `--save-codes` 行为；单独使用 `--save-codes` 仍写 `codes/<id>.pt`。
+- `--save-representations` 会写 `representations/<id>.codes.pt`、`<id>.latent.pt`、`<id>.quantized.pt`，manifest 中同步记录 `codes_path`、`latent_path`、`quantized_path`。
+- `manifest.jsonl` 新增 Phase 1 schema 字段：`schema_version`、`frame_rate`、`hop_length`、`latent_dim`、`nominal_bitrate_kbps`、`rvq_payload_bits`、`context_scope`、`context_window_seconds`、`context_window_frames`、`clip_scope`、`is_full_utterance`。
+- `run.json` 新增 schema、frame/RVQ metadata、context metadata 和 `representation_kinds`。
+- `tests/test_evals_scripts.py` 新增 focused coverage：context window 解析、manifest row schema、临时 checkpoint/audio 的 representation export integration sanity。
+- `evals/README.md` 新增 Phase 1 representation export 命令，并明确短样本 sanity 不能写成长程结论。
+- active spec、feature list、progress 和 `init.sh` 已更新为 Phase 1 export 已实现，下一步进入真实 checkpoint export sanity / Phase 2 diagnostics。
 
 ## 本会话决策
 
-- 旧 `TASK-008-context-sequence-modeling-research.md` 名称和内容已经不再准确，直接替换而不是继续小修。
-- 保留 `TASK-008` 编号，不新建 `TASK-009`，避免制造第二个 active task。
-- Phase 1 下一步只实现 representation export、long/full utterance manifest metadata 和 result schema。
-- Mamba 不是 Phase 1 入口；只有 long-context 收益先成立，才评估 Mamba 是否值得引入。
-- Dynamic / variable frame-rate 是重要后续分支，但当前不进入主线实现。
+- Phase 1 只实现导出和 schema，不训练新模型。
+- Export 使用 model forward 获取 latent/quantized/codes，避免额外 encode/decode 路径遗漏 quantized representation。
+- `context_scope` 默认 `none`，真实 long/full export 可通过 CLI 显式标注 `local | medium | long | full_utterance`。
+- `rvq_payload_bits` 记录 exact RVQ bits；旧 `payload_bits` 继续记录 byte-rounded payload bits，避免破坏既有 benchmark 语义。
 
 ## 仍损坏或未验证
 
 - 未在本轮运行真实训练 smoke。
 - 未在 Linux `4 x A100` 训练机重新验证 smoke。
+- 未用真实 4kbps checkpoint 和可访问的 long/full utterance manifest 跑完整 export；当前 integration sanity 使用临时 checkpoint/audio。
 - Mamba/SSM 依赖尚未固定。
 - Ultra Low-Bitrate Speech Coding、LMCodec、Single-Codec、TFC、CodecSlime 的官方代码或可复现实验设置仍需后续确认。
 - macOS 本地完整单测仍依赖 `KMP_DUPLICATE_LIB_OK=TRUE` workaround；这不应进入 Linux 训练命令。
 
 ## 清洁状态
 
-- `plans/active` 当前只有 `TASK-008-long-range-redundancy-diagnostics-spec.md` 一个 active 文件。
 - Harness：`./scripts/harness-check.sh` 通过，0 warnings。
 - 静态检查：`git diff --check` 通过。
+- Focused export help：`evals/scripts/export_neural_codec.py --help` 通过。
+- Focused tests：`tests.test_evals_scripts` 10 tests OK。
 - CLI sanity：训练脚本 help 在 `audiocodec` conda 环境通过。
-- 单测：25 tests OK。
+- 单测：29 tests OK。
 - 临时工件：本轮未创建模型输出、训练日志、下载缓存或调试脚本。
 
 ## 下一步最佳动作
 
-提交本轮 spec 后，下一次开发从 Phase 1 开始：实现 representation export、long/full utterance manifest metadata 和 result schema；不训练新模型、不引入 Mamba 依赖、不做 dynamic frame-rate redesign。
+下一步用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 跑一次真实 export sanity，确认 `latent / quantized / codes` shape 和 metadata；然后进入 Phase 2 frozen representation redundancy diagnostics。
 
 ## 命令
 

@@ -54,6 +54,12 @@ Last reviewed: 2026-05-05
 
 ## Phase 1 实现规格
 
+当前实现状态：
+
+- `evals/scripts/export_neural_codec.py` 已支持 `--save-representations`，可导出 `codes / latent / quantized / reconstruction`。
+- `manifest.jsonl` 和 `run.json` 已写入 Phase 1 schema、context window metadata、frame/RVQ metadata 和 representation paths。
+- `tests/test_evals_scripts.py` 已覆盖 metadata helper 和临时 checkpoint/audio 的 export integration sanity。
+
 实现任务：
 
 - 扩展 `evals/scripts/export_neural_codec.py` 或新增 context export 脚本，保留现有 neural benchmark 行为。
@@ -144,7 +150,7 @@ Dynamic / variable frame-rate 是重要后续分支，但不是当前 fixed-fram
 - README 和 `init.sh` 指向本 spec；
 - `harness/feature_list.json` 的唯一 active item 语义更新为 long-range diagnostics / context modeling route；
 - 每个 phase 都清楚区分实现任务和实验任务；
-- 下一位 agent 可以直接从 Phase 1 开始实现 representation export；
+- 下一位 agent 可以直接运行 Phase 1 真实 export sanity，并在通过后进入 Phase 2 diagnostics；
 - 验证命令全部通过，失败项必须写入 `harness/session-handoff.md`。
 
 ## 验证命令
@@ -160,4 +166,4 @@ macOS 上 `KMP_DUPLICATE_LIB_OK=TRUE` 只作为本地 OpenMP workaround，不进
 
 ## 下一步
 
-若用户确认本 spec，下一提交从 Phase 1 开始：实现 representation export、long/full utterance manifest metadata 和 result schema，不训练新模型，不引入 Mamba 依赖。
+下一步用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 跑一次真实 export sanity，然后进入 Phase 2 frozen representation redundancy diagnostics；不训练新模型，不引入 Mamba 依赖。
