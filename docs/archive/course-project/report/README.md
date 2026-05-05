@@ -14,6 +14,6 @@ Last reviewed: 2026-05-05
 
 - [项目总览](/Users/ely/workspace/research/audio/AudioCodec/docs/overview.md)
 - [Research Idea](/Users/ely/workspace/research/audio/AudioCodec/docs/idea.md)
-- [TASK-008](/Users/ely/workspace/research/audio/AudioCodec/plans/active/TASK-008-context-sequence-modeling-research.md)
+- [TASK-008 Spec](/Users/ely/workspace/research/audio/AudioCodec/plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md)
 
 本目录仍可作为历史 benchmark 叙事、图表样式和课程交付参考。

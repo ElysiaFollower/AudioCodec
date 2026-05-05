@@ -52,5 +52,5 @@ PYTHONPATH=src python scripts/train_codec.py --config configs/ablation-adversari
 
 - 当前 macOS 开发机完整单测需要 `KMP_DUPLICATE_LIB_OK=TRUE` 绕过 OpenMP runtime 冲突；这不是 Linux A100 训练命令的一部分。
 - 尚未在本轮运行真实训练 smoke。
-- Mamba/SSM 依赖尚未固定；一阶段需要先调研并比较 TCN、LSTM、Transformer、Mamba 等上下文模型。
-- 一阶段研究收集产物尚未完成，当前 active item 仍是 `phase-1-research-intake-and-experiment-prep`。
+- Mamba/SSM 依赖尚未固定；只有 long-context diagnostics 通过 gate 后才评估是否引入 Mamba。
+- 研究收集和方向定义已完成；当前 active item 是 `long-range-redundancy-diagnostics-and-context-route`，下一步是 Phase 1 representation export。

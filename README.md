@@ -20,7 +20,7 @@ Last reviewed: 2026-05-05
 - [上下文建模研究收集](./docs/research/context-modeling-intake.md)
 - [长程时间冗余相关研究补充](./docs/research/long-range-redundancy-intake.md)
 - [上下文建模实现与实验计划](./docs/research/context-modeling-experiment-plan.md)
-- [当前执行计划](./plans/active/TASK-008-context-sequence-modeling-research.md)
+- [当前执行计划](./plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md)
 - [Harness 交接](./harness/session-handoff.md)
 
 历史 baseline、课程报告与旧 benchmark 资料已经归档到 [docs/archive](./docs/archive/README.md)，不再定义当前设计。

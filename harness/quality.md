@@ -18,7 +18,7 @@ Last reviewed: 2026-05-05
 ## 健康信号
 
 - `AGENTS.md` 长度：目标 50-150 行，当前作为短路由维护。
-- WIP limit：1；当前唯一 active item 是 `phase-1-research-intake-and-experiment-prep`。
+- WIP limit：1；当前唯一 active item 是 `long-range-redundancy-diagnostics-and-context-route`。
 - 功能清单有效性：已按 `scripts/harness-check.sh` schema 补齐字段。
 - 交接新鲜度：本轮结束前必须更新 `harness/session-handoff.md`。
 - 验证命令健康度：harness check 和静态检查作为最低门禁；完整单测依赖 `audiocodec` conda 环境。
@@ -28,7 +28,7 @@ Last reviewed: 2026-05-05
 
 ## 维护队列
 
-- 一阶段完成后，把研究收集产物沉淀为长期文档、ADR、实验计划或直接归档。
+- Phase 1 完成后，把 representation export schema 和验证证据沉淀到 active spec、progress 和 handoff。
 - 若新增代码路径，补对应单测或 smoke，并把验证命令写入 feature item。
 - 若再次出现 agent 忘记更新 progress/handoff，优先增强 `scripts/harness-check.sh` 或任务完成 checklist。
 - 若 `AGENTS.md` 超过 150 行，把专题规则迁移到 `docs/` 或 `harness/`。

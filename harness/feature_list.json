@@ -63,7 +63,7 @@
         "init.sh 可执行，并能打印当前阶段、入口文档和验证命令",
         "scripts/harness-check.sh 检查 AGENTS 长度、硬规则数量、占位符、feature schema、WIP=1 和 passing evidence",
         "harness/bootstrap-contract.md、decisions.md、observability.md、evaluator-rubric.md、quality.md 已用项目事实替换 scaffold 占位符",
-        "feature_list.json 当前唯一 active item 是 phase-1-research-intake-and-experiment-prep",
+        "feature_list.json 当前唯一 active item 是 long-range-redundancy-diagnostics-and-context-route",
         "./scripts/harness-check.sh passed: 0 warnings",
         "./init.sh passed and printed recovery commands",
         "git diff --check passed",
@@ -73,16 +73,16 @@
       "notes": "后续任务结束前必须更新 progress、feature_list 和 session-handoff；若 agent 再次遗漏，优先增强 harness-check。"
     },
     {
-      "id": "phase-1-research-intake-and-experiment-prep",
+      "id": "long-range-redundancy-diagnostics-and-context-route",
       "priority": "P0",
       "area": "docs/plans/evals",
-      "title": "一阶段收集 idea 相关研究并准备开发实验",
-      "behavior": "围绕 docs/idea.md 收集 neural speech codec、RVQ/tokenizer、context modeling、entropy coding、long-range redundancy、dynamic/variable frame-rate 和 Mamba/SSM 相关研究与代码，把证据映射到 early context、latent context、post-RVQ context 和 code-prior context，并产出可执行的实验准备清单。",
+      "title": "长程时间冗余诊断与上下文建模实现路线",
+      "behavior": "围绕 docs/idea.md 的最新主题，用 active spec 定义 fixed-frame SEANet/RVQ baseline 上的 long-range redundancy diagnostics、code-prior entropy、latent/post-RVQ context training 和条件 dynamic frame-rate 分支；后续实现从 representation export 开始。",
       "status": "active",
       "verification": [
         "./scripts/harness-check.sh",
-        "人工审查研究收集产物是否覆盖 idea 中的竞争假设和必要 baseline",
-        "人工审查下一阶段实现计划是否列出验证命令、数据、指标和 out-of-scope"
+        "人工审查 plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md 是否能让下一位 agent 直接进入 Phase 1",
+        "人工审查每个 phase 是否明确区分实现任务和实验任务"
       ],
       "evidence": [
         "docs/research/context-modeling-intake.md 建立第一版研究收集主表，覆盖 early feature、latent、post-RVQ embedding、code prior 和 Mamba/SSM model family",
@@ -97,9 +97,11 @@
         "docs/research/context-modeling-experiment-plan.md 明确 E0-E2 是 go/no-go diagnostics，只有 medium/long/full utterance 相比 local 有额外收益时才进入 codec context 训练",
         "evals/README.md 的 benchmark 手册链接已更新到归档路径，避免新会话打开失效路径",
         "docs/research/long-range-redundancy-intake.md 补充 long-range Transformer speech coding、codec-token language modeling、time-invariant/multi-scale/low-frame-rate tokenizer、TFC/CodecSlime dynamic frame-rate 路线和通用化阻碍",
-        "docs/research/context-modeling-intake.md、context-modeling-attempt-log.md、context-modeling-blockers.md 已同步新增 Single-Codec、TFC、CodecSlime 等更贴近 temporal redundancy 的材料"
+        "docs/research/context-modeling-intake.md、context-modeling-attempt-log.md、context-modeling-blockers.md 已同步新增 Single-Codec、TFC、CodecSlime 等更贴近 temporal redundancy 的材料",
+        "plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md 替换旧 context sequence modeling plan，按 phase 区分实现任务和实验任务",
+        "README.md 和 init.sh 已指向新的 active spec"
       ],
-      "notes": "当前唯一 active item。研究收集和实现层计划已建立；仍等待人工审查方向是否对齐，确认后再创建或切换到代码实现任务。"
+      "notes": "当前唯一 active item。下一步从 Phase 1 开始实现 representation export、long/full utterance manifest metadata 和 result schema；不直接实现 Mamba codec 或 dynamic frame-rate redesign。"
     }
   ]
 }

@@ -72,3 +72,15 @@ Last reviewed: 2026-05-05
   - `git diff --check` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，25 tests OK。
+- 用户要求把新的长程时间冗余主题固化为 `plans/active` 下的详细 spec，并按 phase 区分实现任务和实验任务。
+- 已用 `plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md` 替换旧的 `TASK-008-context-sequence-modeling-research.md`，保留 TASK-008 编号和 WIP=1。
+- 新 spec 明确当前主线：先做 fixed-frame SEANet/RVQ baseline 的 E0-E2 go/no-go diagnostics；long/full context 相比最佳 local baseline 至少达到 `>=5%` estimated entropy bitrate 或 predictability improvement，才进入 codec context training。
+- 新 spec 把 dynamic / variable frame-rate 定义为条件分支：只有 diagnostics 显示收益集中在静音、长元音或 steady-state segment 时另开任务，不混入 fixed-frame context 实验主线。
+- 已同步 README、init.sh、archive report link、feature list、bootstrap contract、quality 和 handoff 的 active spec 路由。
+- 本轮 spec 验证：
+  - `./init.sh` 通过，并打印新的 active spec 路径。
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，25 tests OK。

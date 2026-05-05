@@ -8,7 +8,7 @@ repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$repo_root"
 
 echo "项目：AudioCodec speech neural codec research workspace"
-echo "当前阶段：一阶段调研收集 idea 相关研究，并准备开发与实验"
+echo "当前阶段：长程时间冗余诊断与上下文建模实现路线已固化，下一步进入 representation export"
 echo "技术栈：Python 3.11, PyTorch, torchaudio, SEANet-style encoder/decoder, EMA RVQ, evals scripts"
 echo
 
@@ -22,7 +22,7 @@ cat <<'EOF'
 
 建议先读：
 - docs/idea.md
-- plans/active/TASK-008-context-sequence-modeling-research.md
+- plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md
 - harness/feature_list.json
 - harness/session-handoff.md
 
