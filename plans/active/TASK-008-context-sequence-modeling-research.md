@@ -64,3 +64,9 @@ Last reviewed: 2026-05-05
 - 指标和结果表字段；
 - 数据路径和运行命令；
 - matched baseline 和 out-of-scope。
+
+已完成实现层细化：
+
+- `docs/research/context-modeling-experiment-plan.md`
+
+该计划把下一阶段提交顺序收窄为 representation export、code-prior entropy baseline、latent context、post-RVQ refiner 和 early feature 拆分。当前任务保持 active，等待人工审查方向是否对齐。

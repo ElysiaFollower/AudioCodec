@@ -48,3 +48,10 @@ Last reviewed: 2026-05-05
   - `README.md`、`docs/overview.md` 和 `TASK-008` 已指向研究收集产物。
 - 第一轮 intake 结论：code-prior/entropy 方向已有 EnCodec 和 LMCodec 直接证据；early/latent context 有 Convolutional Transformer、BigCodec 等启发但变量混杂；Mamba 目前仍是 model family 候选，不是 codec 结论。
 - Commit 3 最佳动作：把 idea 细化到实现层，定义最小实验矩阵、结果采集 schema、RVQ code/latent 导出需求、数据路径、指标和 out-of-scope。
+- Commit 3 建立实现与实验计划：
+  - `docs/research/context-modeling-experiment-plan.md` 定义 E0-E5 实验矩阵：representation export、redundancy diagnostics、code-prior entropy、latent context、post-RVQ context、early feature；
+  - 明确第一轮主实现锚点为 `configs/ablation-adversarial-msstft-balanced-4kbps.json`，稳定后再扩展 `2 / 8 / 12 kbps` ladder；
+  - 明确新增 context 配置字段、`[B, C, T] -> [B, C, T]` context module 边界、representation manifest 字段、code-prior entropy 公式和统一结果表字段；
+  - 明确当前 SEANet baseline 已带 `SkipLSTM`，后续不能把 baseline 自带 LSTM 误报为新增上下文收益；
+  - 修正 `evals/README.md` 中传统 codec benchmark 手册链接到归档路径。
+- 下一步需要用户审查 Commit 3 方向；确认后再进入 Commit 4 的 representation export 实现，不直接跳到 Mamba 或完整训练矩阵。

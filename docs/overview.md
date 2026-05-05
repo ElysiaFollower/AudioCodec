@@ -48,6 +48,7 @@ waveform -> SEANet encoder -> downsampled latent -> EMA RVQ -> RVQ codes -> quan
 - [当前 codec baseline](/Users/ely/workspace/research/audio/AudioCodec/docs/architecture/current-codec-baseline.md)
 - [ADR 0002](/Users/ely/workspace/research/audio/AudioCodec/docs/adr/0002-temporal-redundancy-research-scope.md)
 - [上下文建模研究收集](/Users/ely/workspace/research/audio/AudioCodec/docs/research/context-modeling-intake.md)
+- [上下文建模实现与实验计划](/Users/ely/workspace/research/audio/AudioCodec/docs/research/context-modeling-experiment-plan.md)
 
 归档或草稿实现笔记在：
 
@@ -60,8 +61,8 @@ waveform -> SEANet encoder -> downsampled latent -> EMA RVQ -> RVQ codes -> quan
 当前 idea 已基本明确。下一步是一阶段研究收集和实验准备：
 
 - 继续维护 `docs/research/context-modeling-intake.md` 中的论文和代码收集；
-- 按 `waveform/early feature`、`downsampled latent`、`post-RVQ embedding`、`RVQ codes/code prior` 补齐证据；
-- 明确 TCN、LSTM、Transformer、Mamba 等上下文模型的 matched baseline 位置；
-- 准备后续开发和实验的最小矩阵、指标和验证命令。
+- 以 `docs/research/context-modeling-experiment-plan.md` 为下一阶段实现入口；
+- 先实现 representation export、code-prior entropy baseline 和 latent/post-RVQ context smoke；
+- 暂缓 SEANet early feature 拆分，等导出、结果表和 matched baseline 工具链稳定后再做。
 
 实现应服务于这个对照，而不是提前预设某个层级或某个模型族一定获胜。

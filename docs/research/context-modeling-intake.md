@@ -86,7 +86,11 @@ Last reviewed: 2026-05-05
 
 ## 下一步
 
-基于本文档进入 Commit 3：
+基于本文档已进入实现层计划：
+
+- `docs/research/context-modeling-experiment-plan.md`
+
+后续代码实现从该计划出发：
 
 1. 定义最小实验矩阵，不超过一条主 codec baseline 加两到三个上下文插入层级。
 2. 定义结果采集 schema，明确哪些指标来自现有 `evals/scripts`，哪些需要新增。

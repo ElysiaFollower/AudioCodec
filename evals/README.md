@@ -33,7 +33,7 @@ evals/
 
 完整命令见：
 
-- [run-traditional-codec-benchmark.md](/Users/ely/workspace/research/audio/AudioCodec/docs/how-to/run-traditional-codec-benchmark.md)
+- [run-traditional-codec-benchmark.md](/Users/ely/workspace/research/audio/AudioCodec/docs/archive/course-project/how-to/run-traditional-codec-benchmark.md)
 
 第一版已经支持：
 

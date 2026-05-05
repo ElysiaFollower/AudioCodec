@@ -8,13 +8,14 @@ Last reviewed: 2026-05-05
 
 - 分支：`feat/context-modeling`
 - 已有提交：`8c54781 docs: define context modeling research baseline`
-- 当前待提交目标：Commit 2，建立第一版研究收集产物。
-- Commit 2 新增/修改范围：
-  - added: `docs/research/context-modeling-intake.md`
-  - added: `docs/research/context-modeling-attempt-log.md`
-  - added: `docs/research/context-modeling-blockers.md`
+- 已有提交：`11e4bf3 docs: add context modeling research intake`
+- 当前待提交目标：Commit 3，建立实现层实验计划与结果采集协议。
+- Commit 3 新增/修改范围：
+  - added: `docs/research/context-modeling-experiment-plan.md`
+  - modified: `docs/research/context-modeling-intake.md`
   - modified: `README.md`
   - modified: `docs/overview.md`
+  - modified: `evals/README.md`
   - modified: `plans/active/TASK-008-context-sequence-modeling-research.md`
   - modified: `harness/feature_list.json`
   - modified: `harness/progress.md`
@@ -41,6 +42,9 @@ Last reviewed: 2026-05-05
 - 新增 `docs/research/context-modeling-attempt-log.md`，记录首轮 primary source verification，明确本轮不下载 PDF、不 clone 外部 repo。
 - 新增 `docs/research/context-modeling-blockers.md`，记录官方代码缺口、entropy coding 覆盖不足和 Mamba codec 直接证据不足。
 - README、overview 和 TASK-008 已指向研究收集产物，并把下一步改为实现层细化与实验/结果采集规划。
+- 新增 `docs/research/context-modeling-experiment-plan.md`，定义 E0-E5 最小实验矩阵、context config 接口、representation export manifest、code-prior entropy 公式、统一结果表字段、数据命令和 Commit 4+ 顺序。
+- 明确当前 SEANet baseline 已带 `SkipLSTM`，后续实验不能把 baseline 自带 LSTM 当成新增 context 收益。
+- 修正 `evals/README.md` 中传统 codec benchmark 手册链接到 `docs/archive/course-project/how-to/run-traditional-codec-benchmark.md`。
 - 使用 `harness-project-initializer-zh` scaffold 补齐缺失的 harness 工件，并替换全部 scaffold 占位符。
 - 将 `AGENTS.md` 重写为短路由入口，明确要求 agent 自主维护 `harness/progress.md`、`harness/feature_list.json`、`harness/session-handoff.md`。
 - 将当前 active item 更新为一阶段研究收集与实验准备，而不是继续停留在 idea 待确认。
@@ -56,6 +60,7 @@ Last reviewed: 2026-05-05
 - `AGENTS.md` 只保留入口、事实来源、硬规则、验证阶梯和完成定义；专题细节放入 docs、harness、plans 或脚本。
 - 当前唯一 active feature 是 `phase-1-research-intake-and-experiment-prep`。
 - 一阶段先围绕 `docs/idea.md` 做研究收集和实验准备；不直接实现 Mamba-only codec 或固定 latent/code-level context。
+- Commit 4 不直接实现 Mamba；先实现 representation export 和 result schema，保证后续 code-prior / latent context / post-RVQ context 共享同一结果采集路径。
 - 后续如果 agent 忘记更新状态文件，应优先增强 `scripts/harness-check.sh`，而不是继续往 `AGENTS.md` 堆规则。
 
 ## 仍损坏或未验证
@@ -63,7 +68,7 @@ Last reviewed: 2026-05-05
 - 未在本轮运行真实训练 smoke。
 - 未在 Linux `4 x A100` 训练机重新验证 smoke。
 - Mamba/SSM 依赖和版本尚未固定。
-- 一阶段研究收集主表已创建，但还未形成下一阶段实现计划、结果采集 schema 或最小实验矩阵。
+- 一阶段研究收集主表和实现层实验计划已创建，但仍等待用户审查方向是否对齐；因此 active feature 暂不标为 passing。
 - 首轮未下载论文 PDF、未 clone 外部仓库，也未验证外部代码可运行性。
 - LMCodec 和 Convolutional Transformer 暂未找到官方代码；Mamba codec 直接证据仍不足。
 - macOS 本地完整单测仍依赖 `KMP_DUPLICATE_LIB_OK=TRUE` workaround；这不应进入 Linux 训练命令。
@@ -79,7 +84,7 @@ Last reviewed: 2026-05-05
 
 ## 下一步最佳动作
 
-开始 Commit 3：基于 `docs/research/context-modeling-intake.md`，把 idea 细化到实现层，定义最小实验矩阵、RVQ code/latent/reconstruction 导出需求、结果采集 schema、数据路径、指标和 out-of-scope。
+等待用户审查 Commit 3 的方向。若确认对齐，下一步进入 Commit 4：实现 representation export 和 result schema，不训练新模型、不引入 Mamba 依赖。
 
 ## 命令
 
