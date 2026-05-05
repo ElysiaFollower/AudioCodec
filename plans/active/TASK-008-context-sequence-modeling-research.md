@@ -14,12 +14,13 @@ Last reviewed: 2026-05-05
 - 哪些代码库或实现路线可以复用；
 - 哪些 baseline 必须 matched；
 - 哪些指标和实验命令能验证 idea，而不是只验证模型能跑。
+- 如何区分 local context 控制组和 medium/long/full utterance context 主实验。
 
 ## 背景
 
 当前项目 idea 已基本明确：
 
-> 在 neural speech codec 中，应该在哪个表示层级引入时间上下文建模，才能把时间冗余转化为真实的压缩收益或保真率收益？
+> 在 neural speech codec 中，应该在哪个表示层级引入大时间窗口的上下文建模，才能把普通局部卷积尚未利用的长程时间冗余转化为真实的压缩收益或保真率收益？
 
 当前风险不在于没有实现脚手架，而在于过早固定实现路线会把研究问题缩窄成 “Mamba codec” 或 “latent/code-level context 一定更好”。
 
@@ -38,6 +39,7 @@ Last reviewed: 2026-05-05
 - 固定最终实验矩阵；
 - 运行完整训练或大规模 benchmark；
 - 改变 stable codec baseline 的 frame rate、codebook size、loss recipe、front-end 或 RVQ payload accounting；
+- 把小窗口卷积/TCN 收益包装成大时间窗口冗余收益；
 - 在没有 matched baseline 和验证结果前写论文级强 claim。
 
 ## 验收标准
@@ -64,6 +66,7 @@ Last reviewed: 2026-05-05
 - 指标和结果表字段；
 - 数据路径和运行命令；
 - matched baseline 和 out-of-scope。
+- `context_scope`、`context_window_seconds`、`context_window_frames`，以及 2 秒 sanity 与长片段正式实验的边界。
 
 已完成实现层细化：
 

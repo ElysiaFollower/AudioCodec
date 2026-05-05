@@ -8,11 +8,11 @@ Last reviewed: 2026-05-05
 
 本项目研究：
 
-> 在 neural speech codec 中，应该在哪个表示层级引入时间上下文建模，才能把语音中的时间冗余真正转化为压缩收益或保真率收益？
+> 在 neural speech codec 中，应该在哪个表示层级引入大时间窗口的上下文建模，才能把语音中的长程时间冗余真正转化为压缩收益或保真率收益？
 
 换句话说：
 
-> 上下文建模是应该尽早进入 waveform / early feature 层，在信息被量化丢失前利用冗余；还是应该等 codec 把 waveform 转成更短、更结构化的 latent / code 序列后再进入？
+> 大时间窗口上下文建模是应该尽早进入 waveform / early feature 层，在信息被量化丢失前利用跨秒级甚至整段语音的冗余；还是应该等 codec 把 waveform 转成更短、更结构化的 latent / code 序列后再进入？
 
 这就是当前 idea。其他内容都是围绕这个 idea 设计证据。
 
@@ -20,13 +20,15 @@ Last reviewed: 2026-05-05
 
 语音信号有很强的时间冗余。
 
-相邻 waveform sample 高度相关；连续语音帧之间共享 pitch、phonetic content、speaker timbre、prosody、room/channel characteristics。直觉上，如果 codec 对每个局部 frame 做得太独立，那么每个 frame 可能都被迫携带本来可以从上下文预测出来的信息。
+相邻 waveform sample 高度相关；连续语音帧之间共享 pitch、phonetic content、speaker timbre、prosody、room/channel characteristics。这里真正关心的不是普通卷积已经能覆盖的相邻几帧，而是更大时间窗口中的冗余：数秒内的 phonetic/prosodic continuity、speaker/channel stability、重复发音模式、长音频中的 token/code predictability。
+
+如果只是把一个小感受野卷积替换成 Mamba，这不是本项目要研究的核心问题。小窗口上下文可以由卷积或 TCN 处理，它应该作为控制组，而不是主要贡献。
 
 因此，最自然的起始 assumption 是：
 
-> 引入上下文序列建模，可以利用 speech signal 中的时间冗余，从而改善压缩效率或重建保真率。
+> 引入超出普通 codec 局部感受野的大窗口上下文序列建模，可以利用 speech signal 中的长程时间冗余，从而改善压缩效率或重建保真率。
 
-这个 assumption 并不是 Mamba 专属的。Transformer、LSTM、TCN、Mamba 都可以被视为上下文模型。
+这个 assumption 并不是 Mamba 专属的。Transformer、LSTM、TCN、Mamba 都可以被视为上下文模型。但 TCN/local conv 在这里主要用于回答“局部上下文是否已经足够”；真正需要 Mamba/Transformer 级别模型的前提，是实验窗口超过普通卷积可以经济覆盖的范围。
 
 ## 3. 真正的研究张力
 
@@ -40,7 +42,7 @@ Last reviewed: 2026-05-05
 
 这是用户最初提出、也最值得认真验证的直觉。
 
-> 时间冗余在 raw waveform 或 early high-rate representation 中最直接可见。因此，上下文模型应该尽早进入，在 framewise quantization 丢失信息或迫使每个 frame 重复携带上下文之前利用这些冗余。
+> 时间冗余在 raw waveform 或 early high-rate representation 中最直接可见。因此，大窗口上下文模型应该尽早进入，在 framewise quantization 丢失信息或迫使每个 frame 重复携带跨秒级上下文之前利用这些冗余。
 
 它为什么合理：
 
@@ -55,13 +57,14 @@ Last reviewed: 2026-05-05
 
 这是另一个可能成立的解释。
 
-> raw waveform 的冗余虽然最大，但很多是局部、连续、signal-like 的冗余，卷积、filterbank 或 SEANet front-end 已经能有效处理。上下文模型可能在 downsampled latent 或 RVQ codes 上更有用，因为那里序列更短，冗余更接近信息选择和 bitstream 可压缩性。
+> raw waveform 的冗余虽然最大，但很多是局部、连续、signal-like 的冗余，卷积、filterbank 或 SEANet front-end 已经能有效处理。大窗口上下文模型可能在 downsampled latent 或 RVQ codes 上更有用，因为那里序列更短，更适合建模数秒到整段语音的 phonetic/prosodic/timbre continuity，也更接近信息选择和 bitstream 可压缩性。
 
 它为什么合理：
 
 - raw waveform 冗余可能太底层，主要是 phase、局部平滑、短周期结构；
 - SEANet encoder 的卷积结构已经让每个 latent frame 看到了局部上下文；
-- 下采样之后，序列长度短很多，上下文模型更容易建模 phonetic/prosodic/timbre continuity；
+- 下采样之后，序列长度短很多，上下文模型更容易覆盖长时间窗口；
+- 长程 phonetic/prosodic/timbre continuity 在 latent/code 层可能比在 raw waveform 层更可预测；
 - RVQ codes 的可预测性可以直接对应 entropy coding，也就是实际 bitstream savings。
 
 如果这个假设成立，那么“冗余最明显的位置”不等于“最值得用上下文模型的位置”。真正重要的是哪一层的冗余最容易转化为压缩收益。
@@ -72,7 +75,7 @@ Last reviewed: 2026-05-05
 
 核心问题是：
 
-> 沿着 `waveform -> downsampled latent -> RVQ embedding/codes -> code prior` 这条表示链，上下文建模在哪一层产生最强收益？这种收益到底是哪一种收益？
+> 沿着 `waveform -> downsampled latent -> RVQ embedding/codes -> code prior` 这条表示链，大窗口上下文建模在哪一层产生最强收益？这种收益到底是哪一种收益？
 
 可能的收益至少有五类：
 
@@ -90,16 +93,17 @@ Mamba 不是第一性 assumption。
 
 第一性 assumption 是：
 
-> 上下文建模可以利用时间冗余。
+> 大窗口上下文建模可以利用普通局部 codec 模块尚未充分利用的长程时间冗余。
 
 Mamba 是实现上下文建模的一类候选模型。它对应的是第二层假设：
 
-> 如果某些层级确实需要上下文建模，那么 Mamba 可能在长序列、低内存或 streaming 上比 Transformer 更合适，同时保持接近的质量。
+> 如果某些层级确实需要跨数秒或整段语音的上下文建模，那么 Mamba 可能在长序列、低内存或 streaming 上比 Transformer 更合适，同时保持接近的质量。
 
 所以项目有两层问题：
 
-1. **位置问题**：上下文建模应该在哪一层进入 codec？
-2. **模型族问题**：在上下文建模有效的位置，Mamba 是否比 Transformer / LSTM / TCN 更值得用？
+1. **位置问题**：大窗口上下文建模应该在哪一层进入 codec？
+2. **尺度问题**：收益来自局部几帧，还是来自数秒到整段语音的长程上下文？
+3. **模型族问题**：在大窗口上下文建模有效的位置，Mamba 是否比 Transformer / LSTM / TCN 更值得用？
 
 如果 Mamba 在质量上没有超过 Transformer，但在长音频或流式推理中显著更省内存、更低延迟，这仍然可能是有价值的结果。
 
@@ -111,13 +115,14 @@ Mamba 是实现上下文建模的一类候选模型。它对应的是第二层�
 
 最小证据应该回答三个问题：
 
-1. **时间冗余在哪些层可测？**
+1. **时间冗余在哪些层、哪些时间尺度可测？**
    - waveform 或 early feature；
    - downsampled latent；
    - post-RVQ embedding；
    - discrete RVQ codes。
+   - 局部窗口、数秒窗口、整段 utterance 必须分开。
 
-2. **上下文建模在哪些层能把冗余转化为 codec 收益？**
+2. **大窗口上下文建模在哪些层能把冗余转化为 codec 收益？**
    - early context；
    - latent context；
    - post-RVQ context；
@@ -125,6 +130,7 @@ Mamba 是实现上下文建模的一类候选模型。它对应的是第二层�
 
 3. **Mamba 是否特殊，还是只是另一个上下文模型？**
    - 至少要和 Transformer 以及一个更简单的 local/recurrent baseline 比较；
+   - 如果 Mamba 只在局部小窗口上替代卷积，不构成本项目的核心证据；
    - 质量和效率要分开判断。
 
 这已经足够定义科研工作。具体实现顺序可以在 idea 稳定后再定。
@@ -138,7 +144,7 @@ Mamba 是实现上下文建模的一类候选模型。它对应的是第二层�
 解释：
 
 - 用户最初的直觉成立；
-- 在量化前建模 raw 或 near-raw signal context 最重要；
+- 在量化前建模跨秒级或整段语音 context 最重要；
 - 项目可以转成一篇关于 neural speech codec 中早期时间上下文建模的论文。
 
 但这需要强对照，尤其是 matched conv / TCN baseline。
@@ -148,7 +154,7 @@ Mamba 是实现上下文建模的一类候选模型。它对应的是第二层�
 解释：
 
 - 可见冗余不等于有用冗余；
-- codec 把序列变短、变结构化之后，上下文模型更容易把冗余转化为 rate-distortion 收益；
+- codec 把序列变短、变结构化之后，上下文模型更容易覆盖长时间窗口，并把冗余转化为 rate-distortion 收益；
 - 项目可以写成表示层级研究。
 
 ### 结果 3：code prior 最强，但重建不明显提升
@@ -177,6 +183,10 @@ Mamba 是实现上下文建模的一类候选模型。它对应的是第二层�
 安全版本：
 
 > 我们研究 neural speech codec 中时间上下文建模应该在哪个表示层级进入，并区分“冗余是否可见”和“冗余是否能转化为压缩收益”。
+
+更准确地说：
+
+> 我们研究超出普通局部卷积感受野的大窗口时间上下文建模，应该在哪个 codec 表示层级进入，并区分局部冗余和长程冗余是否能转化为压缩收益。
 
 如果假设 B 成立，强版本可以是：
 

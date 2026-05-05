@@ -8,7 +8,7 @@ Last reviewed: 2026-05-05
 
 本仓库现在是一个科研工作区，核心问题只有一个：
 
-> 在 neural speech codec 中，应该在哪个表示层级引入时间上下文建模，才能把时间冗余转化为真实的压缩收益或保真率收益？
+> 在 neural speech codec 中，应该在哪个表示层级引入大时间窗口的上下文建模，才能把普通局部卷积尚未利用的长程时间冗余转化为真实的压缩收益或保真率收益？
 
 当前 idea 的定义见：
 
@@ -62,6 +62,7 @@ waveform -> SEANet encoder -> downsampled latent -> EMA RVQ -> RVQ codes -> quan
 
 - 继续维护 `docs/research/context-modeling-intake.md` 中的论文和代码收集；
 - 以 `docs/research/context-modeling-experiment-plan.md` 为下一阶段实现入口；
+- 把 local conv/TCN 作为控制组，而不是主要贡献；
 - 先实现 representation export、code-prior entropy baseline 和 latent/post-RVQ context smoke；
 - 暂缓 SEANet early feature 拆分，等导出、结果表和 matched baseline 工具链稳定后再做。
 

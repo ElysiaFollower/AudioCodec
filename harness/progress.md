@@ -57,3 +57,5 @@ Last reviewed: 2026-05-05
 - 下一步需要用户审查 Commit 3 方向；确认后再进入 Commit 4 的 representation export 实现，不直接跳到 Mamba 或完整训练矩阵。
 - 用户指出 Commit 3 仍缺少关键定义：什么叫“插入时间序列建模”，如果不能说清楚，计划不严谨。
 - 已补强 `docs/research/context-modeling-experiment-plan.md`：把插入定义为固定表示边界上的同形状 residual `TemporalMixer: [B, C, T] -> [B, C, T]`，并分别定义 latent pre-RVQ、post-RVQ embedding、code prior 和 early feature 的前后数据流、允许收益和禁止混淆项。
+- 用户进一步明确：如果只是把局部卷积感受野换成 Mamba，没有研究价值；真正目标是更大时间窗口甚至整段长音频的时间冗余。
+- 已更新 `docs/idea.md` 和 `docs/research/context-modeling-experiment-plan.md`：local conv/TCN 只作为控制组，主问题收窄为 medium/long/full utterance context；正式实验必须记录 `context_scope`、`context_window_seconds`、`context_window_frames`，并避免把 2 秒 clip sanity 写成长程结论。

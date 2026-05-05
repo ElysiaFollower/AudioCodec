@@ -9,7 +9,7 @@ Last reviewed: 2026-05-05
 本文档把 `docs/idea.md` 和 `docs/research/context-modeling-intake.md` 细化到实现层。目标不是一次性跑完论文矩阵，而是让下一阶段代码实现能稳定回答三个问题：
 
 1. 时间冗余在哪些表示层可测；
-2. 哪些层级的上下文建模能转成 codec 收益；
+2. 哪些层级的大时间窗口上下文建模能转成 codec 收益；
 3. Mamba 是否比 matched TCN / LSTM / Transformer 更值得用。
 
 ## 当前工程事实
@@ -19,10 +19,13 @@ Last reviewed: 2026-05-05
 - `evals/scripts/export_neural_codec.py` 已支持 `--save-codes`，但还不能保存 latent / quantized embedding，也不能统一写 context experiment metadata。
 - 当前 SEANet encoder/decoder 已有 `seanet_lstm_layers=2`，其 `SkipLSTM` 位于 downsampled bottleneck 附近。第一轮 context 实验应保持该 baseline 不变，不能把 baseline 自带 LSTM 误报为新增收益。
 - `evals/scripts/score_outputs.py` 已覆盖 reconstruction 指标：`actual_bitrate_kbps`、`compression_ratio_vs_pcm16`、`si_sdr_db`、`log_spectral_distance`、`multi_scale_stft`、`stoi`。
+- 当前训练配置默认 `train_clip_seconds=2.0`。这只适合本地 sanity 和短片段 smoke，不足以支撑长程时间冗余结论。正式实验必须使用更长 clip 或整段 utterance export。
 
 ## 什么叫插入时间序列建模
 
-这里的“插入”不是说原 codec 完全逐帧独立。当前 SEANet 已经有卷积感受野和 bottleneck `SkipLSTM`。本项目的插入定义更窄：
+这里的“插入”不是说原 codec 完全逐帧独立。当前 SEANet 已经有卷积感受野和 bottleneck `SkipLSTM`。本项目也不是要把小感受野卷积替换成 Mamba。局部几帧上下文可以由卷积或 TCN 处理，它是必要控制组，不是主要研究点。
+
+本项目的插入定义更窄：
 
 > 在固定的 codec 表示边界上，把原本会直接传给下一步的序列张量 `x [B, C, T]`，替换为同形状的 `x_ctx = x + TemporalMixer(x)`，然后让后续模块只消费 `x_ctx`。
 
@@ -33,6 +36,8 @@ Last reviewed: 2026-05-05
 - `T` 是该表示层的时间 frame 数；
 - 一个 frame 是 `x[:, :, t]`，表示当前层在时间位置 `t` 的向量，而不是 raw waveform sample；
 - `TemporalMixer` 可以是 TCN、LSTM、Transformer 或 Mamba，但输入输出必须保持 `[B, C, T]`，不得改变 frame rate、latent dim、RVQ stage 数或 codebook size。
+
+研究目标中的 `TemporalMixer` 必须显式声明可见时间范围。如果它只覆盖普通卷积可以经济覆盖的邻近几帧，只能作为 local baseline。
 
 工程接口必须满足：
 
@@ -55,6 +60,33 @@ x_ctx = x + output_projection(mixer(input_projection(norm(x))))
 
 `identity` baseline 定义为 `x_ctx = x`。这样新增路径可以和 baseline 做形状、payload 和训练稳定性对照。
 
+## 上下文时间尺度定义
+
+上下文尺度按当前插入层的 frame rate 计算，而不是按 raw sample 数计算。当前稳定 latent/code frame rate 是 `50 Hz`，所以：
+
+| 尺度 | 当前 50 Hz latent/code 下的参考窗口 | 角色 |
+| --- | --- | --- |
+| local | `<= 1 s`，约 `<= 50` frames | 控制组；卷积/TCN 通常能覆盖 |
+| medium | `1-5 s`，约 `50-250` frames | 过渡组；检查收益是否开始超过局部上下文 |
+| long | `> 5 s` 或整段 utterance，约 `> 250` frames | 主要研究目标 |
+| full utterance | 当前样本的全部 frames | offline 上限；不能写 streaming claim |
+
+因此，后续实验必须报告：
+
+- `context_window_seconds`；
+- `context_window_frames`；
+- `context_scope`: `local | medium | long | full_utterance`；
+- `context_causal`: true / false。
+
+如果一个实验的 `context_scope=local`，它只能回答“局部上下文是否足够”，不能支撑 Mamba 或长程冗余 claim。
+
+训练与评测要求：
+
+- macOS sanity 可以继续使用 2 秒 clip。
+- 正式 redundancy diagnostics 和 code-prior 评估必须至少包含 `10-30 s` 或完整 utterance 片段。
+- 正式 codec context 训练如果受显存限制，可以从 `5 s` clip 起步，但不能把 2 秒 clip 的结果写成长程结论。
+- 如果使用 full utterance / non-causal context，结果只能作为 offline codec 上限。
+
 ## 插入点的精确定义
 
 ### Latent pre-RVQ
@@ -76,6 +108,7 @@ waveform -> encoder -> latent -> TemporalMixer(latent) -> RVQ -> quantized -> de
 - `TemporalMixer` 在量化前跨 latent frames 交换信息；
 - RVQ codes 会改变，因此它测试的是 rate-distortion / fidelity 是否改善；
 - payload 仍只由 RVQ codes 决定，不允许额外发送 mixer hidden state。
+- 如果 `TemporalMixer` 只看 local window，该 run 是局部控制组；主要实验应覆盖 medium/long/full utterance。
 
 ### Post-RVQ embedding
 
@@ -97,6 +130,7 @@ codes -> RVQ decode -> quantized -> TemporalMixer(quantized) -> decoder
 - receiver 通过共享模型参数从 codes 恢复 `quantized`，再运行同一个 `TemporalMixer`；
 - 该实验只能证明 nominal payload 不变时 reconstruction fidelity 是否提升；
 - 如果任何额外 per-frame side information 被写入 manifest 或 bitstream，该 run 无效。
+- 该层适合测试 decoder-side 长窗口补偿是否有用，但不能声称降低 nominal payload。
 
 ### Code prior
 
@@ -114,6 +148,7 @@ codes [B, K, T] -> Prior -> p(code_{k,t} | previous codes)
 - `K` 是 RVQ stage；
 - prior 可以按 stage 单独建模，也可以把 `(t, k)` 展平成 token 序列，但必须记录 token ordering；
 - 该实验只报告 bits-per-code、estimated entropy bitrate 和 token efficiency，不报告 reconstruction fidelity gain。
+- 这是最适合先验证长程冗余的方向，因为可以用 frozen codes 跑 medium/long/full utterance prior，而不需要重训 codec。
 
 ### Early feature
 
@@ -128,6 +163,7 @@ waveform -> encoder_prefix -> early_feature -> TemporalMixer(early_feature) -> e
 - `early_feature [B, C_s, T_s]` 的 `T_s` 通常高于 latent 的 `T`；
 - 该层最接近用户关于 waveform-proximal context 的假设；
 - 它需要重构 SEANet stage 边界，工程风险高，排在 representation export、code prior、latent 和 post-RVQ 之后。
+- early feature 的 frame rate 更高，长窗口代价更大；如果 Mamba 在这里有价值，应该体现在比 Transformer 更低的长序列成本，而不是替代小卷积核。
 
 ## Causality 与可比较性
 
@@ -135,11 +171,13 @@ waveform -> encoder_prefix -> early_feature -> TemporalMixer(early_feature) -> e
 - `context.causal=false`：`x_ctx[:, :, t]` 可以依赖整段 utterance，适合 offline fidelity / RD claim。
 - causal 和 non-causal 结果不能放在同一行直接比较，必须在结果表中记录 `context_causal`。
 - 当前 SEANet 使用对称/reflect padding，整体更接近 offline baseline。若要写 streaming claim，必须单独建立 causal baseline。
+- 对本项目主问题而言，`context_scope` 和 `context_window_seconds` 与 `context_causal` 同等重要；只报告 causal/non-causal 不足以说明是否真的建模了长程冗余。
 
 下面这些不算合法的“插入时间序列建模”：
 
 - 改变 sample rate、frame rate、codebook size、RVQ stage 数或 loss recipe；
 - 只把 encoder/decoder 整体加宽加深，却没有固定边界的 `x -> x_ctx` 对照；
+- 用 Mamba 替换小窗口卷积，但没有 medium/long/full utterance 上下文；
 - post-RVQ refiner 发送额外 side channel；
 - 用 code prior 的 entropy 改善来宣称 reconstruction fidelity 改善；
 - 只比较 Mamba 和 no-context，而没有 matched TCN/LSTM/Transformer baseline。
@@ -151,10 +189,10 @@ waveform -> encoder_prefix -> early_feature -> TemporalMixer(early_feature) -> e
 | 阶段 | 目的 | 插入层级 | 模型族 / baseline | 主要输出 | 是否训练 codec |
 | --- | --- | --- | --- | --- | --- |
 | E0 export | 固定可复现实验样本和表示导出 | latent / quantized / codes | current baseline only | representation manifest | no |
-| E1 diagnostics | 测时间冗余是否可见 | latent / quantized / codes | autocorrelation, nearest previous frame, unigram / previous-frame code entropy | redundancy metrics JSONL | no |
-| E2 code-prior | 测 codes 能否转成 entropy 收益 | RVQ codes / code prior | unigram, previous-frame, TCN, LSTM, Transformer, Mamba | bits-per-code, estimated entropy bitrate | no codec retrain |
-| E3 latent context | 测量化前 context 是否改善 RD | latent pre-RVQ | identity, matched TCN, LSTM, Transformer, Mamba | reconstruction metrics + params/latency | yes |
-| E4 post-RVQ context | 测无 side-channel refiner 是否只改善保真率 | quantized embedding pre-decoder | identity, matched TCN, LSTM, Transformer, Mamba | reconstruction metrics + no payload change proof | yes |
+| E1 diagnostics | 测长程时间冗余是否可见 | latent / quantized / codes | horizon sweep: local / medium / long / full utterance | redundancy metrics JSONL | no |
+| E2 code-prior | 测 codes 能否转成 entropy 收益 | RVQ codes / code prior | unigram, previous-frame, local TCN, long LSTM/Transformer/Mamba | bits-per-code, estimated entropy bitrate by horizon | no codec retrain |
+| E3 latent context | 测量化前 long context 是否改善 RD | latent pre-RVQ | identity, local TCN control, long Transformer/Mamba | reconstruction metrics + params/latency | yes |
+| E4 post-RVQ context | 测无 side-channel long refiner 是否只改善保真率 | quantized embedding pre-decoder | identity, local TCN control, long Transformer/Mamba | reconstruction metrics + no payload change proof | yes |
 | E5 early feature | 测 waveform-proximal 假设 | early SEANet feature | matched conv/TCN first, then Transformer/Mamba | reconstruction metrics + cost | yes, after E3/E4 |
 
 `E5` 不作为第一批代码实现入口，因为它需要把 SEANet encoder 拆成可插入 stage。它必须进入论文级矩阵，但应在 `E0-E4` 工具链稳定后做。
@@ -174,6 +212,9 @@ context.hidden_dim: int
 context.num_layers: int
 context.kernel_size: int
 context.dropout: float
+context.window_seconds: float | null
+context.window_frames: int | null
+context.scope: local | medium | long | full_utterance
 ```
 
 所有 codec 内 context module 都必须是同形状 residual mixer。它不是新的 encoder、decoder 或 quantizer，也不能单独改变 payload accounting。
@@ -182,7 +223,7 @@ context.dropout: float
 
 - `src/audiocodec/models/context.py`：统一 `[B, C, T] -> [B, C, T]` 接口。
 - `IdentityContext`：用于验证配置路径不改变 baseline。
-- `TCNContext`：第一简单 baseline，参数量应和后续模型族记录在结果表。
+- `TCNContext`：local control baseline，参数量和有效窗口必须记录在结果表。
 - `LSTMContext`：recurrent baseline，不能和 SEANet 自带 `SkipLSTM` 混淆。
 - `TransformerContext`：Transformer-family baseline。
 - `MambaContext`：若依赖未安装，配置为 `family=mamba` 时必须给出清晰错误；不能静默退化成 identity。
@@ -214,6 +255,7 @@ run.json
 - `checkpoint_path`, `checkpoint_step`, `config_path`, `codec_label`
 - `frame_rate`, `hop_length`, `num_frames`, `latent_dim`
 - `num_quantizers`, `codebook_size`, `bits_per_code`
+- `clip_scope`, `clip_duration_seconds`, `is_full_utterance`
 - `nominal_bitrate_kbps`, `rvq_payload_bits`, `rvq_payload_bytes`
 - `codes_path`, `latent_path`, `quantized_path`, `reconstruction_path`
 
@@ -239,10 +281,10 @@ evals/outputs/context-priors/<run_id>/
 
 1. unigram per stage；
 2. previous-frame / local Markov prior；
-3. TCN；
-4. LSTM；
-5. Transformer；
-6. Mamba。
+3. local-window TCN；
+4. long-window LSTM；
+5. long-window Transformer；
+6. long-window Mamba。
 
 如果 Mamba 依赖未固定，先实现到 Transformer，并把 Mamba 标为 blocked，而不是替换研究问题。
 
@@ -256,6 +298,9 @@ stage
 insertion_point
 context_family
 context_causal
+context_scope
+context_window_seconds
+context_window_frames
 config_path
 checkpoint_path
 checkpoint_step
@@ -287,6 +332,7 @@ notes
 - `actual_bitrate_kbps` 对 neural RVQ baseline 仍等于 RVQ nominal payload，除非真实 entropy coding 已实现。
 - `estimated_entropy_bitrate_kbps` 是 prior 估计，不等于真实文件大小。
 - `post_rvq_embedding` 的 payload 必须和 identity / baseline 相同，否则实验无效。
+- local-window 结果必须标成控制组；论文 claim 应优先依据 medium/long/full utterance 结果。
 
 ## 数据与命令
 
@@ -307,13 +353,13 @@ PYTHONPATH=src python scripts/train_codec.py --config configs/ablation-adversari
 
 正式实验默认沿用配置中的 LibriSpeech speech 数据路径；如果机器路径不同，必须通过 `--dataset-root` 覆盖并写入 run metadata。
 
-Benchmark 样本继续使用 `evals/data/manifests/test.jsonl`。传统 codec 和 neural codec 结果继续通过 `evals/scripts/score_outputs.py` 汇总，context-specific 字段由新增 aggregator 补齐。
+Benchmark 样本可以继续使用 `evals/data/manifests/test.jsonl` 做 reconstruction 对比，但长程冗余实验必须新增或筛选更长片段 manifest。传统 codec 和 neural codec 结果继续通过 `evals/scripts/score_outputs.py` 汇总，context-specific 字段由新增 aggregator 补齐。
 
 ## 下一阶段提交顺序
 
-1. Commit 4：实现 representation export 和 result schema，不训练新模型。
-2. Commit 5：实现 code-prior entropy baselines，先到 unigram / previous-frame / TCN / Transformer。
-3. Commit 6：实现 `latent_pre_rvq` context module，先跑 identity / TCN / Transformer smoke。
+1. Commit 4：实现 representation export 和 result schema，支持长片段 / full utterance metadata，不训练新模型。
+2. Commit 5：实现 code-prior entropy baselines，先到 unigram / previous-frame / local TCN / long Transformer。
+3. Commit 6：实现 `latent_pre_rvq` context module，先跑 identity / local TCN control / long Transformer smoke。
 4. Commit 7：补 LSTM / Mamba family，并固定 Mamba 依赖或明确阻塞。
 5. Commit 8：实现 `post_rvq_embedding` refiner，并加入 no-side-channel 检查。
 6. Commit 9：拆 SEANet early feature 插入点，进入 waveform-proximal 对照。
@@ -323,5 +369,6 @@ Benchmark 样本继续使用 `evals/data/manifests/test.jsonl`。传统 codec �
 - 不改变 frame rate、codebook size、loss recipe、front-end 或 RVQ payload accounting。
 - 不引入 semantic distillation、音乐数据集或通用音频扩展。
 - 不把 Mamba 作为唯一主线。
+- 不把小窗口上下文收益包装成长程时间冗余收益。
 - 不把 estimated entropy bitrate、nominal bitrate、actual file bitrate 和 reconstruction quality 混成一个指标。
 - 不在没有 matched TCN/LSTM/Transformer baseline 前写论文级强 claim。
