@@ -1,6 +1,6 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-05-05
+Last reviewed: 2026-05-06
 
 # Progress
 
@@ -98,3 +98,24 @@ Last reviewed: 2026-05-05
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，10 tests OK。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，29 tests OK。
+
+## 2026-05-06
+
+- 用户说明 Linux 训练机暂时不好访问，要求继续做本地开发，等积累到一定量后再用 bash 脚本程式化训练以高效使用算力。
+- Phase 2 frozen representation diagnostics 工具实现完成：
+  - 新增 `evals/scripts/diagnose_representations.py`，输入 Phase 1 export 目录，输出 `diagnostics/diagnostics.jsonl` 和 `diagnostics/summary.json`；
+  - 对连续表示 `latent / quantized` 使用 past-window mean prediction，报告 `normalized_mse` 和 `predictability_score`；
+  - 对离散 `codes` 使用 window reuse proxy，报告 `window_reuse_rate`、`previous_frame_match_rate` 和 `marginal_entropy_bits_per_code`；
+  - summary 中按 representation / context scope 聚合，并给出 long/full 相比 local 的 `>=5%` gate recommendation。
+- 新增 synthetic diagnostics 测试，覆盖 latent / quantized / codes 三类 representation 和 summary gate 输出。
+- 更新 `evals/README.md` 和 active spec，记录 Phase 2 命令与 proxy metric 边界：这些指标是 go/no-go 前置筛查，不等于 Phase 3 learned code-prior entropy。
+- 本轮 Phase 2 验证：
+  - `./init.sh` 通过，并打印新的当前阶段提示。
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/diagnose_representations.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/export_neural_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，11 tests OK。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，30 tests OK。

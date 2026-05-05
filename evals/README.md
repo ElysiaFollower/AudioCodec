@@ -1,6 +1,6 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-05-05
+Last reviewed: 2026-05-06
 
 # Evals
 
@@ -46,6 +46,16 @@ PYTHONPATH=src python evals/scripts/export_neural_codec.py \
 ```
 
 该模式会在 `manifest.jsonl` 中记录 `latent_path`、`quantized_path`、`codes_path`、`context_scope`、`context_window_seconds`、`context_window_frames`、`frame_rate`、`hop_length`、`nominal_bitrate_kbps` 和 `rvq_payload_bits` 等字段。短样本 sanity 不能写成长程结论。
+
+Phase 2 frozen representation diagnostics 消费上述 export 目录：
+
+```bash
+PYTHONPATH=src python evals/scripts/diagnose_representations.py \
+  --export-dir evals/outputs/context-modeling/neural-4k-export \
+  --representations latent quantized codes
+```
+
+该脚本输出 `diagnostics/diagnostics.jsonl` 和 `diagnostics/summary.json`。连续表示使用 past-window mean prediction 的 `normalized_mse` / `predictability_score`，离散 codes 使用 `window_reuse_rate`、`previous_frame_match_rate` 和 `marginal_entropy_bits_per_code`。这些是 Phase 2 proxy diagnostics，不等于 Phase 3 learned code-prior entropy。
 
 完整命令见：
 

@@ -25,6 +25,11 @@ from _common import (
     write_jsonl,
 )
 from _metrics import compute_log_spectral_distance, compute_multi_scale_stft, compute_si_sdr_db
+from diagnose_representations import (
+    DIAGNOSTICS_SCHEMA_VERSION,
+    _scope_specs,
+    run_diagnostics,
+)
 from export_neural_codec import (
     CONTEXT_EXPORT_SCHEMA_VERSION,
     _build_manifest_row,
@@ -207,6 +212,80 @@ class NeuralExportMetadataTest(unittest.TestCase):
             self.assertEqual(latent.shape, quantized.shape)
             self.assertEqual(latent.shape[0], 1)
             self.assertEqual(latent.shape[1], config.model.latent_dim)
+
+
+class RepresentationDiagnosticsTest(unittest.TestCase):
+    def test_run_diagnostics_writes_rows_and_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            export_dir = root / "export"
+            output_dir = export_dir / "diagnostics"
+            reps_dir = export_dir / "representations"
+            reps_dir.mkdir(parents=True)
+
+            latent = torch.arange(12, dtype=torch.float32).view(1, 2, 6)
+            quantized = latent + 1.0
+            codes = torch.tensor([[[1, 1, 2, 2, 2, 3], [4, 4, 4, 5, 5, 5]]], dtype=torch.long)
+            latent_path = reps_dir / "utt.latent.pt"
+            quantized_path = reps_dir / "utt.quantized.pt"
+            codes_path = reps_dir / "utt.codes.pt"
+            torch.save(latent, latent_path)
+            torch.save(quantized, quantized_path)
+            torch.save(codes, codes_path)
+
+            manifest_path = export_dir / "manifest.jsonl"
+            write_jsonl(
+                manifest_path,
+                [
+                    {
+                        "id": "utt",
+                        "frame_rate": 2,
+                        "latent_path": str(latent_path),
+                        "quantized_path": str(quantized_path),
+                        "codes_path": str(codes_path),
+                    }
+                ],
+            )
+            args = type(
+                "Args",
+                (),
+                {
+                    "local_window_seconds": 0.5,
+                    "medium_window_seconds": 1.5,
+                    "long_window_seconds": 3.0,
+                },
+            )()
+
+            diagnostics, summary = run_diagnostics(
+                export_dir=export_dir,
+                output_dir=output_dir,
+                manifest_path=manifest_path,
+                representations=["latent", "quantized", "codes"],
+                scope_specs=_scope_specs(args),
+            )
+
+            self.assertEqual(len(diagnostics), 12)
+            self.assertTrue((output_dir / "diagnostics.jsonl").exists())
+            self.assertTrue((output_dir / "summary.json").exists())
+            self.assertEqual(summary["schema_version"], DIAGNOSTICS_SCHEMA_VERSION)
+            self.assertEqual(len(summary["gate_recommendations"]), 3)
+            latent_local = [
+                row
+                for row in diagnostics
+                if row["representation"] == "latent" and row["context_scope"] == "local"
+            ][0]
+            self.assertEqual(latent_local["schema_version"], DIAGNOSTICS_SCHEMA_VERSION)
+            self.assertEqual(latent_local["metric_family"], "continuous_past_window_mean")
+            self.assertEqual(latent_local["context_window_frames"], 1)
+            self.assertIsNotNone(latent_local["normalized_mse"])
+            code_full = [
+                row
+                for row in diagnostics
+                if row["representation"] == "codes" and row["context_scope"] == "full_utterance"
+            ][0]
+            self.assertEqual(code_full["metric_family"], "code_window_reuse")
+            self.assertIsNotNone(code_full["window_reuse_rate"])
+            self.assertIsNotNone(code_full["marginal_entropy_bits_per_code"])
 
 
 class EvalMetricsTest(unittest.TestCase):

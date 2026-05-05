@@ -1,6 +1,6 @@
 {
   "owner": "ely",
-  "last_reviewed": "2026-05-05",
+  "last_reviewed": "2026-05-06",
   "wip_limit": 1,
   "features": [
     {
@@ -77,12 +77,14 @@
       "priority": "P0",
       "area": "docs/plans/evals",
       "title": "长程时间冗余诊断与上下文建模实现路线",
-      "behavior": "围绕 docs/idea.md 的最新主题，用 active spec 定义 fixed-frame SEANet/RVQ baseline 上的 long-range redundancy diagnostics、code-prior entropy、latent/post-RVQ context training 和条件 dynamic frame-rate 分支；后续实现从 representation export 开始。",
+      "behavior": "围绕 docs/idea.md 的最新主题，用 active spec 定义 fixed-frame SEANet/RVQ baseline 上的 long-range redundancy diagnostics、code-prior entropy、latent/post-RVQ context training 和条件 dynamic frame-rate 分支；当前已实现 representation export 和 frozen representation diagnostics 工具。",
       "status": "active",
       "verification": [
         "./scripts/harness-check.sh",
-        "人工审查 plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md 是否能让下一位 agent 直接进入 Phase 1",
-        "人工审查每个 phase 是否明确区分实现任务和实验任务"
+        "git diff --check",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/diagnose_representations.py --help",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v"
       ],
       "evidence": [
         "docs/research/context-modeling-intake.md 建立第一版研究收集主表，覆盖 early feature、latent、post-RVQ embedding、code prior 和 Mamba/SSM model family",
@@ -102,9 +104,17 @@
         "README.md 和 init.sh 已指向新的 active spec",
         "evals/scripts/export_neural_codec.py 已支持 --save-representations，导出 codes / latent / quantized / reconstruction 并写入 Phase 1 schema metadata",
         "tests/test_evals_scripts.py 覆盖 context window metadata、manifest row schema 和临时 checkpoint/audio 的 representation export integration sanity",
-        "evals/README.md 已记录 Phase 1 representation export 命令和短样本 sanity 边界"
+        "evals/README.md 已记录 Phase 1 representation export 命令和短样本 sanity 边界",
+        "evals/scripts/diagnose_representations.py 已支持读取 Phase 1 export 目录并输出 diagnostics.jsonl / summary.json",
+        "tests/test_evals_scripts.py 覆盖 synthetic latent / quantized / codes representation diagnostics 和 summary gate 输出",
+        "evals/README.md 已记录 Phase 2 diagnostics 命令与 proxy metric 边界",
+        "./scripts/harness-check.sh passed: 0 warnings",
+        "git diff --check passed",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/diagnose_representations.py --help passed",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v passed: 11 tests OK",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 30 tests OK"
       ],
-      "notes": "当前唯一 active item。Phase 1 representation export 已实现；下一步用可访问的 long/full utterance manifest 和 4kbps checkpoint 跑真实 export sanity，再进入 Phase 2 diagnostics。"
+      "notes": "当前唯一 active item。Phase 1 export 与 Phase 2 diagnostics 工具已实现；下一步用可访问的 long/full utterance manifest 和 4kbps checkpoint 串真实 export+diagnostics sanity，然后再开发 Phase 3 code-prior baseline。"
     }
   ]
 }

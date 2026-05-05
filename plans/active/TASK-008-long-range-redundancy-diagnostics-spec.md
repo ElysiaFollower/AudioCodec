@@ -1,6 +1,6 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-05-05
+Last reviewed: 2026-05-06
 
 # TASK-008 长程时间冗余诊断与上下文建模实现路线 Spec
 
@@ -78,6 +78,13 @@ Last reviewed: 2026-05-05
 - 不把 2 秒或短样本 sanity 写成长程结论。
 
 ## Phase 2 实验规格
+
+当前实现状态：
+
+- `evals/scripts/diagnose_representations.py` 已支持读取 Phase 1 export 目录，输出 `diagnostics.jsonl` 和 `summary.json`。
+- 连续表示 `latent / quantized` 使用 past-window mean prediction，报告 `normalized_mse` 和 `predictability_score`。
+- 离散 `codes` 使用 window reuse proxy，报告 `window_reuse_rate`、`previous_frame_match_rate` 和 `marginal_entropy_bits_per_code`。
+- `tests/test_evals_scripts.py` 已覆盖 synthetic representation diagnostics 和 summary gate 输出。
 
 实现任务：
 
@@ -166,4 +173,4 @@ macOS 上 `KMP_DUPLICATE_LIB_OK=TRUE` 只作为本地 OpenMP workaround，不进
 
 ## 下一步
 
-下一步用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 跑一次真实 export sanity，然后进入 Phase 2 frozen representation redundancy diagnostics；不训练新模型，不引入 Mamba 依赖。
+下一步用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 串起 Phase 1 export + Phase 2 diagnostics sanity；不训练新模型，不引入 Mamba 依赖。等本地工具链积累到 Phase 3/4，再编写统一 bash 脚本程式化执行导出、诊断、prior 和训练。
