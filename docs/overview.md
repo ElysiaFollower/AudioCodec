@@ -49,6 +49,7 @@ waveform -> SEANet encoder -> downsampled latent -> EMA RVQ -> RVQ codes -> quan
 - [当前 codec baseline](/Users/ely/workspace/research/audio/AudioCodec/docs/architecture/current-codec-baseline.md)
 - [ADR 0002](/Users/ely/workspace/research/audio/AudioCodec/docs/adr/0002-temporal-redundancy-research-scope.md)
 - [上下文建模研究收集](/Users/ely/workspace/research/audio/AudioCodec/docs/research/context-modeling-intake.md)
+- [长程时间冗余相关研究补充](/Users/ely/workspace/research/audio/AudioCodec/docs/research/long-range-redundancy-intake.md)
 - [上下文建模实现与实验计划](/Users/ely/workspace/research/audio/AudioCodec/docs/research/context-modeling-experiment-plan.md)
 
 归档或草稿实现笔记在：

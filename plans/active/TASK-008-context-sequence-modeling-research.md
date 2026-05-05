@@ -58,18 +58,12 @@ Last reviewed: 2026-05-05
 - `docs/research/context-modeling-intake.md`
 - `docs/research/context-modeling-attempt-log.md`
 - `docs/research/context-modeling-blockers.md`
-
-下一步从研究收集出发，把 idea 细化到实现层。实现计划至少要明确：
-
-- 最小实验矩阵；
-- RVQ code / latent / reconstruction 结果导出方式；
-- 指标和结果表字段；
-- 数据路径和运行命令；
-- matched baseline 和 out-of-scope。
-- `context_scope`、`context_window_seconds`、`context_window_frames`，以及 2 秒 sanity 与长片段正式实验的边界。
+- `docs/research/long-range-redundancy-intake.md`
 
 已完成实现层细化：
 
 - `docs/research/context-modeling-experiment-plan.md`
 
-该计划把下一阶段提交顺序收窄为 representation export、code-prior entropy baseline、latent context、post-RVQ refiner 和 early feature 拆分。当前任务保持 active，等待人工审查方向是否对齐。
+主题重定后已补充 long-range focused refresh：现有研究中有 Ultra Low-Bitrate / LMCodec / EnCodec 这类 long-context 或 code-prior 证据，也有 TiCodec / Single-Codec / SNAC / WavTokenizer / TFC / CodecSlime 这类把长程或 steady-state temporal redundancy 转成 tokenization / frame-rate redesign 的路线。当前任务保持 active，等待人工审查方向是否对齐。
+
+如果方向确认，下一步进入 Commit 4：实现 representation export、long/full utterance manifest metadata 和 result schema，先支撑 E0-E2 go/no-go diagnostics；不直接实现 Mamba codec 或 dynamic frame-rate redesign。

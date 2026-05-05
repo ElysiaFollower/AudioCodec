@@ -18,6 +18,7 @@ Last reviewed: 2026-05-05
 - [ADR 0002：围绕上下文插入位置定义科研问题](./docs/adr/0002-temporal-redundancy-research-scope.md)
 - [当前 codec baseline](./docs/architecture/current-codec-baseline.md)
 - [上下文建模研究收集](./docs/research/context-modeling-intake.md)
+- [长程时间冗余相关研究补充](./docs/research/long-range-redundancy-intake.md)
 - [上下文建模实现与实验计划](./docs/research/context-modeling-experiment-plan.md)
 - [当前执行计划](./plans/active/TASK-008-context-sequence-modeling-research.md)
 - [Harness 交接](./harness/session-handoff.md)

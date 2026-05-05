@@ -77,7 +77,7 @@
       "priority": "P0",
       "area": "docs/plans/evals",
       "title": "一阶段收集 idea 相关研究并准备开发实验",
-      "behavior": "围绕 docs/idea.md 收集 neural speech codec、RVQ/tokenizer、context modeling、entropy coding 和 Mamba/SSM 相关研究与代码，把证据映射到 early context、latent context、post-RVQ context 和 code-prior context，并产出可执行的实验准备清单。",
+      "behavior": "围绕 docs/idea.md 收集 neural speech codec、RVQ/tokenizer、context modeling、entropy coding、long-range redundancy、dynamic/variable frame-rate 和 Mamba/SSM 相关研究与代码，把证据映射到 early context、latent context、post-RVQ context 和 code-prior context，并产出可执行的实验准备清单。",
       "status": "active",
       "verification": [
         "./scripts/harness-check.sh",
@@ -95,7 +95,9 @@
         "docs/research/context-modeling-experiment-plan.md 明确 2 秒 clip 只能做 sanity，正式长程实验需要 10-30 秒或 full utterance manifest / metadata",
         "docs/idea.md、docs/overview.md、README.md、ADR 0002 和 TASK-008 已将主题更新为：局部时序建模已是 baseline，当前研究 long-range redundancy 的存在性、层级归因和收益归因",
         "docs/research/context-modeling-experiment-plan.md 明确 E0-E2 是 go/no-go diagnostics，只有 medium/long/full utterance 相比 local 有额外收益时才进入 codec context 训练",
-        "evals/README.md 的 benchmark 手册链接已更新到归档路径，避免新会话打开失效路径"
+        "evals/README.md 的 benchmark 手册链接已更新到归档路径，避免新会话打开失效路径",
+        "docs/research/long-range-redundancy-intake.md 补充 long-range Transformer speech coding、codec-token language modeling、time-invariant/multi-scale/low-frame-rate tokenizer、TFC/CodecSlime dynamic frame-rate 路线和通用化阻碍",
+        "docs/research/context-modeling-intake.md、context-modeling-attempt-log.md、context-modeling-blockers.md 已同步新增 Single-Codec、TFC、CodecSlime 等更贴近 temporal redundancy 的材料"
       ],
       "notes": "当前唯一 active item。研究收集和实现层计划已建立；仍等待人工审查方向是否对齐，确认后再创建或切换到代码实现任务。"
     }

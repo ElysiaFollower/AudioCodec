@@ -62,3 +62,13 @@ Last reviewed: 2026-05-05
 - 用户要求重新定主题：局部 temporal modeling 已经是行业共识，项目不能把“加上下文”当创新点。
 - 已更新 `docs/idea.md`、`docs/overview.md`、`README.md`、ADR 0002、TASK-008 和实验计划：当前主题是 neural speech codec 已有局部时序建模后，长程时间冗余是否仍存在；如果存在，它在哪个表示层级最容易转化为 fidelity / RD / entropy / token / efficiency 收益。
 - 实验计划已明确 E0-E2 是 go/no-go diagnostics；如果 long/full context 相比 local 没有额外 predictability 或 entropy 收益，应停止或转向，而不是直接实现 Mamba codec。
+- 用户确认该主题定义对齐，并要求围绕“有没有人已经考虑长程时间冗余、效果如何、为什么未成为通用架构”做一次 focused refresh。
+- 新增 `docs/research/long-range-redundancy-intake.md`：补充 Ultra Low-Bitrate Speech Coding、LMCodec、EnCodec entropy model、AudioLM/SoundStorm/Moshi/LongCat、TiCodec、Single-Codec、SNAC、WavTokenizer、Stable Codec、Temporally Flexible Coding、CodecSlime。
+- focused refresh 结论：没有看到完全同题的 fixed SEANet/RVQ 表示层级归因工作；但已有研究分别证明 long-context/code-prior、time-invariant token、低帧率/多尺度 token 和 dynamic/variable frame rate 能利用一部分长程或 steady-state temporal redundancy。
+- 新增判断：TFC/CodecSlime 是最接近“时间冗余压缩”的相关工作，但它们通过改变 frame allocation 消除固定帧率浪费；这支持问题重要性，同时提醒当前第一阶段应先做 fixed-frame baseline 的 go/no-go diagnostics，再决定是否另开 tokenization/frame-rate redesign。
+- 同步更新 `docs/research/context-modeling-intake.md`、`docs/research/context-modeling-attempt-log.md`、`docs/research/context-modeling-blockers.md`、README、overview、TASK-008 和 feature list。
+- 本轮验证：
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，25 tests OK。

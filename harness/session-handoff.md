@@ -7,30 +7,30 @@ Last reviewed: 2026-05-05
 ## 仓库状态
 
 - 分支：`feat/context-modeling`
-- 已有提交：`8c54781 docs: define context modeling research baseline`
-- 已有提交：`11e4bf3 docs: add context modeling research intake`
-- 已有提交：`9faade8 docs: define context modeling experiment plan`
-- 已有提交：`267c771 docs: clarify temporal context insertion semantics`
-- 当前待提交目标：正式更新研究主题，明确 local temporal modeling 是 baseline，当前研究 long-range redundancy 的存在性、层级归因和收益归因。
+- 已有提交：
+  - `8c54781 docs: define context modeling research baseline`
+  - `11e4bf3 docs: add context modeling research intake`
+  - `9faade8 docs: define context modeling experiment plan`
+  - `267c771 docs: clarify temporal context insertion semantics`
+  - `b57556e docs: refocus context modeling on long-range redundancy`
+  - `705a275 docs: define long-range redundancy research theme`
+- 当前待提交目标：补充长程时间冗余 focused research refresh，回答“现有研究是否考虑过长程/steady-state temporal redundancy、效果如何、为什么没有成为通用 codec 架构”。
 - 本轮新增/修改范围：
-  - modified: `docs/idea.md`
-  - modified: `docs/research/context-modeling-experiment-plan.md`
+  - added: `docs/research/long-range-redundancy-intake.md`
+  - modified: `docs/research/context-modeling-intake.md`
+  - modified: `docs/research/context-modeling-attempt-log.md`
+  - modified: `docs/research/context-modeling-blockers.md`
   - modified: `README.md`
   - modified: `docs/overview.md`
   - modified: `plans/active/TASK-008-context-sequence-modeling-research.md`
   - modified: `harness/feature_list.json`
   - modified: `harness/progress.md`
   - modified: `harness/session-handoff.md`
-- Commit 3 review patch：用户指出“插入时间序列建模”的工程定义不够清楚，已在实验计划中补强定义。
-- Long-context review patch：用户明确真正目标不是小窗口卷积替换成 Mamba，而是更大时间窗口甚至整段长音频的时间冗余；已更新 idea 和实验计划。
-- Theme reset patch：用户要求重新定主题，避免把已有行业共识当创新点；已更新 source-of-truth 文档。
 
 ## 当前已验证状态
 
 - `./scripts/harness-check.sh`
   - 结果：通过，`Harness 检查通过，共 0 个警告。`
-- `./init.sh`
-  - 结果：通过，能打印当前阶段、建议阅读文件、环境命令、聚焦验证、完整验证和 Linux A100 smoke 命令。
 - `git diff --check`
   - 结果：通过。
 - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help`
@@ -40,46 +40,30 @@ Last reviewed: 2026-05-05
 
 ## 本会话改动
 
-- 按用户确认的计划创建分支 `feat/context-modeling`。
-- 已创建首个科研定义基线提交：`8c54781 docs: define context modeling research baseline`。
-- 建立第一版研究收集主表 `docs/research/context-modeling-intake.md`，覆盖 SoundStream、EnCodec、DAC、AudioDec、LMCodec、Convolutional Transformer、BigCodec、SpeechTokenizer、Mimi/Moshi、Mamba/Mamba-2。
-- 新增 `docs/research/context-modeling-attempt-log.md`，记录首轮 primary source verification，明确本轮不下载 PDF、不 clone 外部 repo。
-- 新增 `docs/research/context-modeling-blockers.md`，记录官方代码缺口、entropy coding 覆盖不足和 Mamba codec 直接证据不足。
-- README、overview 和 TASK-008 已指向研究收集产物，并把下一步改为实现层细化与实验/结果采集规划。
-- 新增 `docs/research/context-modeling-experiment-plan.md`，定义 E0-E5 最小实验矩阵、context config 接口、representation export manifest、code-prior entropy 公式、统一结果表字段、数据命令和 Commit 4+ 顺序。
-- 补强 `docs/research/context-modeling-experiment-plan.md` 中“什么叫插入时间序列建模”：定义为固定表示边界上的同形状 residual `TemporalMixer: [B, C, T] -> [B, C, T]`，并明确 latent pre-RVQ、post-RVQ embedding、code prior、early feature 四类插入的数据流语义。
-- 补强 `docs/idea.md` 和 `docs/research/context-modeling-experiment-plan.md` 的研究尺度：local context 只是控制组；主要研究 medium/long/full utterance context，并要求记录 `context_scope`、`context_window_seconds`、`context_window_frames`。
-- 明确当前 `train_clip_seconds=2.0` 只能做 sanity，正式长程冗余实验需要 10-30 秒或 full utterance manifest / metadata。
-- 更新 `docs/idea.md`、`docs/overview.md`、`README.md`、ADR 0002 和 TASK-008：局部时序建模已是 baseline；当前研究 long-range temporal redundancy 的存在性、层级归因和收益归因。
-- 更新 `docs/research/context-modeling-experiment-plan.md`：E0-E2 是 go/no-go diagnostics，只有 medium/long/full utterance 相比 local 有额外收益时，才进入 E3-E5 codec context 训练。
-- 明确当前 SEANet baseline 已带 `SkipLSTM`，后续实验不能把 baseline 自带 LSTM 当成新增 context 收益。
-- 修正 `evals/README.md` 中传统 codec benchmark 手册链接到 `docs/archive/course-project/how-to/run-traditional-codec-benchmark.md`。
-- 使用 `harness-project-initializer-zh` scaffold 补齐缺失的 harness 工件，并替换全部 scaffold 占位符。
-- 将 `AGENTS.md` 重写为短路由入口，明确要求 agent 自主维护 `harness/progress.md`、`harness/feature_list.json`、`harness/session-handoff.md`。
-- 将当前 active item 更新为一阶段研究收集与实验准备，而不是继续停留在 idea 待确认。
-- 将 TASK-008 改成一阶段任务合同，范围包括论文/代码收集、插入层级证据整理、matched baseline 和实验准备。
-- 新增 `scripts/harness-check.sh`，检查 AGENTS 长度、硬规则数量、占位符、feature schema、WIP=1、passing evidence 和 handoff 标题。
-- 更新 README、overview、issue template 和 package description，减少旧课程项目语境对新 agent 的干扰。
-- 首个提交只固化科研项目定义，不新增上下文建模代码、不固定 Mamba 路线、不创建最终实验矩阵。
+- 按用户确认后的新主题补充 long-range focused research refresh。
+- 新增 `docs/research/long-range-redundancy-intake.md`，覆盖：
+  - Ultra Low-Bitrate Speech Coding with Pretrained Transformers；
+  - LMCodec / EnCodec entropy model；
+  - AudioLM / SoundStorm / Moshi / LongCat；
+  - TiCodec / Single-Codec / SNAC / WavTokenizer / Stable Codec；
+  - Temporally Flexible Coding / CodecSlime。
+- 将核心结论写入文档：没有看到完全同题的 fixed SEANet/RVQ 表示层级归因工作；但已有研究分别从 long-context Transformer、code prior、time-invariant token、多尺度/低帧率 token、dynamic/variable frame rate 利用了长程或 steady-state temporal redundancy。
+- 明确 TFC/CodecSlime 是最接近“时间冗余压缩”的相关方向，但它们的主路线是 frame-rate allocation / tokenization redesign，不替代当前 fixed baseline 上的 go/no-go diagnostics。
+- 同步更新研究主表、attempt log、blockers、README、overview、TASK-008、feature list 和 progress。
 
 ## 本会话决策
 
-- 分支名使用 `feat/context-modeling`，按用户偏好覆盖默认 `dev/` 前缀。
-- 首个提交采用阶段小提交策略，范围限定为“科研定义基线”。
-- `AGENTS.md` 只保留入口、事实来源、硬规则、验证阶梯和完成定义；专题细节放入 docs、harness、plans 或脚本。
-- 当前唯一 active feature 是 `phase-1-research-intake-and-experiment-prep`。
-- 一阶段先围绕 `docs/idea.md` 做研究收集和实验准备；不直接实现 Mamba-only codec 或固定 latent/code-level context。
-- Commit 4 不直接实现 Mamba；先实现 representation export 和 result schema，保证 E0-E2 go/no-go diagnostics 有长片段 / full utterance metadata。
-- 后续如果 agent 忘记更新状态文件，应优先增强 `scripts/harness-check.sh`，而不是继续往 `AGENTS.md` 堆规则。
+- 当前第一阶段仍保持 fixed-frame SEANet/RVQ baseline；不因为 TFC/CodecSlime 直接跳到 dynamic frame-rate redesign。
+- E0-E2 go/no-go diagnostics 仍是下一步：先导出长片段 / full utterance 的 latent、quantized embedding 和 RVQ codes，比较 local、medium、long、full context 的 predictability / entropy 曲线。
+- 如果收益主要集中在静音、长元音或缓慢变化区间，下一阶段应开 dynamic/variable frame-rate 或 tokenization redesign 分支，而不是只扩大 context window。
+- Mamba 仍只是候选上下文模型；本轮没有新增 Mamba 依赖或上下文建模代码。
 
 ## 仍损坏或未验证
 
+- 本轮只做 web-level / primary-source-level 调研；未下载论文 PDF、未 clone 外部 repo、未运行外部 demo。
+- Ultra Low-Bitrate Speech Coding、LMCodec、Single-Codec、TFC、CodecSlime 的官方代码或可复现实验设置仍需后续确认。
 - 未在本轮运行真实训练 smoke。
 - 未在 Linux `4 x A100` 训练机重新验证 smoke。
-- Mamba/SSM 依赖和版本尚未固定。
-- 一阶段研究收集主表和实现层实验计划已创建，但仍等待用户审查方向是否对齐；因此 active feature 暂不标为 passing。
-- 首轮未下载论文 PDF、未 clone 外部仓库，也未验证外部代码可运行性。
-- LMCodec 和 Convolutional Transformer 暂未找到官方代码；Mamba codec 直接证据仍不足。
 - macOS 本地完整单测仍依赖 `KMP_DUPLICATE_LIB_OK=TRUE` workaround；这不应进入 Linux 训练命令。
 
 ## 清洁状态
@@ -88,12 +72,11 @@ Last reviewed: 2026-05-05
 - 静态检查：`git diff --check` 通过。
 - CLI sanity：训练脚本 help 在 `audiocodec` conda 环境通过。
 - 单测：25 tests OK。
-- 进度文件同步：`harness/feature_list.json`、`harness/progress.md`、`harness/session-handoff.md` 已同步。
 - 临时工件：本轮未创建模型输出、训练日志、下载缓存或调试脚本。
 
 ## 下一步最佳动作
 
-等待用户审查更新后的主题。若确认对齐，下一步进入 Commit 4：实现 representation export 和 result schema，支持长片段 / full utterance metadata，用于 E0-E2 go/no-go diagnostics；不训练新模型、不引入 Mamba 依赖。
+等待用户审查 focused refresh 是否对齐。若确认，下一步进入 Commit 4：实现 representation export、long/full utterance manifest metadata 和 result schema，支撑 E0-E2 go/no-go diagnostics；不直接实现 Mamba codec 或 dynamic frame-rate redesign。
 
 ## 命令
 
