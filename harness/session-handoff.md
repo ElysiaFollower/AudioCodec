@@ -7,28 +7,18 @@ Last reviewed: 2026-05-05
 ## 仓库状态
 
 - 分支：`feat/context-modeling`
-- 派生基线：`main` 上的 `9880df7`
-- 本轮目标：形成首个科研定义基线提交，commit message 为 `docs: define context modeling research baseline`。
-- 当前定义基线包含：
-  - modified: `AGENTS.md`
+- 已有提交：`8c54781 docs: define context modeling research baseline`
+- 当前待提交目标：Commit 2，建立第一版研究收集产物。
+- Commit 2 新增/修改范围：
+  - added: `docs/research/context-modeling-intake.md`
+  - added: `docs/research/context-modeling-attempt-log.md`
+  - added: `docs/research/context-modeling-blockers.md`
   - modified: `README.md`
   - modified: `docs/overview.md`
   - modified: `plans/active/TASK-008-context-sequence-modeling-research.md`
   - modified: `harness/feature_list.json`
   - modified: `harness/progress.md`
   - modified: `harness/session-handoff.md`
-  - modified: `pyproject.toml`
-  - added: `init.sh`
-  - added: `scripts/harness-check.sh`
-  - added: `harness/bootstrap-contract.md`
-  - added: `harness/decisions.md`
-  - added: `harness/observability.md`
-  - added: `harness/evaluator-rubric.md`
-  - added: `harness/quality.md`
-  - added: `.github/ISSUE_TEMPLATE/research-task.yml`
-  - deleted: `.github/ISSUE_TEMPLATE/course-project.yml`
-- 还包含 docs/archive、ADR 0002、`docs/idea.md`、`docs/architecture/current-codec-baseline.md`、TASK-007 archive 等文档重整改动。
-- 完成本提交后预期工作区清洁；若不清洁，先用 `git status --short` 检查是否有临时工件或后续任务改动。
 
 ## 当前已验证状态
 
@@ -41,11 +31,16 @@ Last reviewed: 2026-05-05
 - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help`
   - 结果：通过，能打印训练 CLI 参数。
 - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v`
-  - 结果：通过，`Ran 25 tests in 1.705s`, `OK`。
+  - 结果：通过，`Ran 25 tests`, `OK`。
 
 ## 本会话改动
 
 - 按用户确认的计划创建分支 `feat/context-modeling`。
+- 已创建首个科研定义基线提交：`8c54781 docs: define context modeling research baseline`。
+- 建立第一版研究收集主表 `docs/research/context-modeling-intake.md`，覆盖 SoundStream、EnCodec、DAC、AudioDec、LMCodec、Convolutional Transformer、BigCodec、SpeechTokenizer、Mimi/Moshi、Mamba/Mamba-2。
+- 新增 `docs/research/context-modeling-attempt-log.md`，记录首轮 primary source verification，明确本轮不下载 PDF、不 clone 外部 repo。
+- 新增 `docs/research/context-modeling-blockers.md`，记录官方代码缺口、entropy coding 覆盖不足和 Mamba codec 直接证据不足。
+- README、overview 和 TASK-008 已指向研究收集产物，并把下一步改为实现层细化与实验/结果采集规划。
 - 使用 `harness-project-initializer-zh` scaffold 补齐缺失的 harness 工件，并替换全部 scaffold 占位符。
 - 将 `AGENTS.md` 重写为短路由入口，明确要求 agent 自主维护 `harness/progress.md`、`harness/feature_list.json`、`harness/session-handoff.md`。
 - 将当前 active item 更新为一阶段研究收集与实验准备，而不是继续停留在 idea 待确认。
@@ -68,7 +63,9 @@ Last reviewed: 2026-05-05
 - 未在本轮运行真实训练 smoke。
 - 未在 Linux `4 x A100` 训练机重新验证 smoke。
 - Mamba/SSM 依赖和版本尚未固定。
-- 一阶段研究收集产物尚未创建；当前只是把任务合同和 harness 状态对齐。
+- 一阶段研究收集主表已创建，但还未形成下一阶段实现计划、结果采集 schema 或最小实验矩阵。
+- 首轮未下载论文 PDF、未 clone 外部仓库，也未验证外部代码可运行性。
+- LMCodec 和 Convolutional Transformer 暂未找到官方代码；Mamba codec 直接证据仍不足。
 - macOS 本地完整单测仍依赖 `KMP_DUPLICATE_LIB_OK=TRUE` workaround；这不应进入 Linux 训练命令。
 
 ## 清洁状态
@@ -82,7 +79,7 @@ Last reviewed: 2026-05-05
 
 ## 下一步最佳动作
 
-开始 `phase-1-research-intake-and-experiment-prep` 的 Commit 2：从 `docs/idea.md` 出发建立研究收集表或文档骨架，按 early waveform/feature、latent bottleneck、post-RVQ embedding、RVQ code prior 四类插入层级整理论文和代码证据。
+开始 Commit 3：基于 `docs/research/context-modeling-intake.md`，把 idea 细化到实现层，定义最小实验矩阵、RVQ code/latent/reconstruction 导出需求、结果采集 schema、数据路径、指标和 out-of-scope。
 
 ## 命令
 

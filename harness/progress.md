@@ -40,3 +40,11 @@ Last reviewed: 2026-05-05
 - 已切换到分支 `feat/context-modeling`，用于承载 context modeling research baseline。
 - 首个提交范围确定为科研定义基线：项目重定位、idea、ADR、当前 codec baseline、harness、TASK-008、旧课程材料归档和仓库入口更新；不在该提交中新增上下文建模代码或固定 Mamba 路线。
 - 后续提交节奏确定为阶段小提交：研究收集产物、实验/结果收集规划、实现计划、代码实现和实验记录分开提交。
+- 已创建首个科研定义基线提交：`8c54781 docs: define context modeling research baseline`。
+- Commit 2 建立第一版研究收集产物：
+  - `docs/research/context-modeling-intake.md`：按 early feature、latent、post-RVQ embedding、code prior 和 model family 整理外部材料；
+  - `docs/research/context-modeling-attempt-log.md`：记录 primary source verification 和本轮有意跳过的 PDF/repo acquisition；
+  - `docs/research/context-modeling-blockers.md`：记录 LMCodec / Convolutional Transformer 官方代码缺口、entropy coding 覆盖不足和 Mamba codec 直接证据不足；
+  - `README.md`、`docs/overview.md` 和 `TASK-008` 已指向研究收集产物。
+- 第一轮 intake 结论：code-prior/entropy 方向已有 EnCodec 和 LMCodec 直接证据；early/latent context 有 Convolutional Transformer、BigCodec 等启发但变量混杂；Mamba 目前仍是 model family 候选，不是 codec 结论。
+- Commit 3 最佳动作：把 idea 细化到实现层，定义最小实验矩阵、结果采集 schema、RVQ code/latent 导出需求、数据路径、指标和 out-of-scope。

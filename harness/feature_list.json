@@ -84,8 +84,13 @@
         "人工审查研究收集产物是否覆盖 idea 中的竞争假设和必要 baseline",
         "人工审查下一阶段实现计划是否列出验证命令、数据、指标和 out-of-scope"
       ],
-      "evidence": [],
-      "notes": "当前唯一 active item。完成前不要新增并行实现任务；若必须实现支撑脚本，应先在 active plan 中收窄范围。"
+      "evidence": [
+        "docs/research/context-modeling-intake.md 建立第一版研究收集主表，覆盖 early feature、latent、post-RVQ embedding、code prior 和 Mamba/SSM model family",
+        "docs/research/context-modeling-attempt-log.md 记录首轮 primary source verification，明确本轮不下载 PDF、不 clone 外部 repo",
+        "docs/research/context-modeling-blockers.md 记录 LMCodec / Convolutional Transformer 官方代码缺口、entropy coding 覆盖不足和 Mamba codec 直接证据不足",
+        "README.md、docs/overview.md 和 TASK-008 已指向研究收集产物"
+      ],
+      "notes": "当前唯一 active item。研究收集主表已建立，但下一阶段实现计划和结果采集 schema 尚未完成；完成前不要新增并行实现任务。"
     }
   ]
 }

@@ -51,11 +51,16 @@ Last reviewed: 2026-05-05
 
 ## 当前下一步
 
-从 `docs/idea.md` 出发，先建立研究收集表或文档骨架。每条材料至少记录：
+已建立第一版研究收集表：
 
-- 论文/代码库；
-- codec/tokenizer 类型；
-- 上下文建模插入层级；
-- 对 bitrate、entropy、保真率或效率的证据；
-- 可复用实现点；
-- 与当前 baseline 的差距和风险。
+- `docs/research/context-modeling-intake.md`
+- `docs/research/context-modeling-attempt-log.md`
+- `docs/research/context-modeling-blockers.md`
+
+下一步从研究收集出发，把 idea 细化到实现层。实现计划至少要明确：
+
+- 最小实验矩阵；
+- RVQ code / latent / reconstruction 结果导出方式；
+- 指标和结果表字段；
+- 数据路径和运行命令；
+- matched baseline 和 out-of-scope。
