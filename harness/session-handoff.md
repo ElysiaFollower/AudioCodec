@@ -20,6 +20,7 @@ Last reviewed: 2026-05-05
   - modified: `harness/feature_list.json`
   - modified: `harness/progress.md`
   - modified: `harness/session-handoff.md`
+- Commit 3 review patch：用户指出“插入时间序列建模”的工程定义不够清楚，已在实验计划中补强定义。
 
 ## 当前已验证状态
 
@@ -43,6 +44,7 @@ Last reviewed: 2026-05-05
 - 新增 `docs/research/context-modeling-blockers.md`，记录官方代码缺口、entropy coding 覆盖不足和 Mamba codec 直接证据不足。
 - README、overview 和 TASK-008 已指向研究收集产物，并把下一步改为实现层细化与实验/结果采集规划。
 - 新增 `docs/research/context-modeling-experiment-plan.md`，定义 E0-E5 最小实验矩阵、context config 接口、representation export manifest、code-prior entropy 公式、统一结果表字段、数据命令和 Commit 4+ 顺序。
+- 补强 `docs/research/context-modeling-experiment-plan.md` 中“什么叫插入时间序列建模”：定义为固定表示边界上的同形状 residual `TemporalMixer: [B, C, T] -> [B, C, T]`，并明确 latent pre-RVQ、post-RVQ embedding、code prior、early feature 四类插入的数据流语义。
 - 明确当前 SEANet baseline 已带 `SkipLSTM`，后续实验不能把 baseline 自带 LSTM 当成新增 context 收益。
 - 修正 `evals/README.md` 中传统 codec benchmark 手册链接到 `docs/archive/course-project/how-to/run-traditional-codec-benchmark.md`。
 - 使用 `harness-project-initializer-zh` scaffold 补齐缺失的 harness 工件，并替换全部 scaffold 占位符。

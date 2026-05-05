@@ -55,3 +55,5 @@ Last reviewed: 2026-05-05
   - 明确当前 SEANet baseline 已带 `SkipLSTM`，后续不能把 baseline 自带 LSTM 误报为新增上下文收益；
   - 修正 `evals/README.md` 中传统 codec benchmark 手册链接到归档路径。
 - 下一步需要用户审查 Commit 3 方向；确认后再进入 Commit 4 的 representation export 实现，不直接跳到 Mamba 或完整训练矩阵。
+- 用户指出 Commit 3 仍缺少关键定义：什么叫“插入时间序列建模”，如果不能说清楚，计划不严谨。
+- 已补强 `docs/research/context-modeling-experiment-plan.md`：把插入定义为固定表示边界上的同形状 residual `TemporalMixer: [B, C, T] -> [B, C, T]`，并分别定义 latent pre-RVQ、post-RVQ embedding、code prior 和 early feature 的前后数据流、允许收益和禁止混淆项。

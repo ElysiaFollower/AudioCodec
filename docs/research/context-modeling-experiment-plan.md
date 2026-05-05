@@ -20,6 +20,130 @@ Last reviewed: 2026-05-05
 - 当前 SEANet encoder/decoder 已有 `seanet_lstm_layers=2`，其 `SkipLSTM` 位于 downsampled bottleneck 附近。第一轮 context 实验应保持该 baseline 不变，不能把 baseline 自带 LSTM 误报为新增收益。
 - `evals/scripts/score_outputs.py` 已覆盖 reconstruction 指标：`actual_bitrate_kbps`、`compression_ratio_vs_pcm16`、`si_sdr_db`、`log_spectral_distance`、`multi_scale_stft`、`stoi`。
 
+## 什么叫插入时间序列建模
+
+这里的“插入”不是说原 codec 完全逐帧独立。当前 SEANet 已经有卷积感受野和 bottleneck `SkipLSTM`。本项目的插入定义更窄：
+
+> 在固定的 codec 表示边界上，把原本会直接传给下一步的序列张量 `x [B, C, T]`，替换为同形状的 `x_ctx = x + TemporalMixer(x)`，然后让后续模块只消费 `x_ctx`。
+
+其中：
+
+- `B` 是 batch；
+- `C` 是当前表示维度，例如 latent dim 或 feature channels；
+- `T` 是该表示层的时间 frame 数；
+- 一个 frame 是 `x[:, :, t]`，表示当前层在时间位置 `t` 的向量，而不是 raw waveform sample；
+- `TemporalMixer` 可以是 TCN、LSTM、Transformer 或 Mamba，但输入输出必须保持 `[B, C, T]`，不得改变 frame rate、latent dim、RVQ stage 数或 codebook size。
+
+工程接口必须满足：
+
+```text
+TemporalContext.forward(x: Tensor[B, C, T]) -> Tensor[B, C, T]
+```
+
+不同模型族只是在内部如何沿 `T` 混合信息不同：
+
+- TCN：保持 `[B, C, T]`，用 causal 或 non-causal 1D convolution 跨 frame 混合；
+- LSTM：转成 `[T, B, C]` 或 `[B, T, C]`，沿时间递推，再转回 `[B, C, T]`；
+- Transformer：转成 `[B, T, C]`，用 self-attention 跨 frame 混合，再转回；
+- Mamba：转成 `[B, T, C]`，用 SSM/selective scan 跨 frame 混合，再转回。
+
+默认实现应使用 residual wrapper：
+
+```text
+x_ctx = x + output_projection(mixer(input_projection(norm(x))))
+```
+
+`identity` baseline 定义为 `x_ctx = x`。这样新增路径可以和 baseline 做形状、payload 和训练稳定性对照。
+
+## 插入点的精确定义
+
+### Latent pre-RVQ
+
+原路径：
+
+```text
+waveform -> encoder -> latent -> RVQ -> quantized -> decoder
+```
+
+插入后：
+
+```text
+waveform -> encoder -> latent -> TemporalMixer(latent) -> RVQ -> quantized -> decoder
+```
+
+含义：
+
+- `TemporalMixer` 在量化前跨 latent frames 交换信息；
+- RVQ codes 会改变，因此它测试的是 rate-distortion / fidelity 是否改善；
+- payload 仍只由 RVQ codes 决定，不允许额外发送 mixer hidden state。
+
+### Post-RVQ embedding
+
+原路径：
+
+```text
+codes -> RVQ decode -> quantized -> decoder
+```
+
+插入后：
+
+```text
+codes -> RVQ decode -> quantized -> TemporalMixer(quantized) -> decoder
+```
+
+含义：
+
+- transmitter 仍只发送 RVQ codes；
+- receiver 通过共享模型参数从 codes 恢复 `quantized`，再运行同一个 `TemporalMixer`；
+- 该实验只能证明 nominal payload 不变时 reconstruction fidelity 是否提升；
+- 如果任何额外 per-frame side information 被写入 manifest 或 bitstream，该 run 无效。
+
+### Code prior
+
+原 codec reconstruction 路径不变。Code prior 不生成新的 waveform，也不改变 decoder 输入。
+
+它只学习离散序列概率：
+
+```text
+codes [B, K, T] -> Prior -> p(code_{k,t} | previous codes)
+```
+
+含义：
+
+- `T` 仍是 codec frame；
+- `K` 是 RVQ stage；
+- prior 可以按 stage 单独建模，也可以把 `(t, k)` 展平成 token 序列，但必须记录 token ordering；
+- 该实验只报告 bits-per-code、estimated entropy bitrate 和 token efficiency，不报告 reconstruction fidelity gain。
+
+### Early feature
+
+Early feature 插入需要把 SEANet encoder 显式拆成两段：
+
+```text
+waveform -> encoder_prefix -> early_feature -> TemporalMixer(early_feature) -> encoder_suffix -> latent -> RVQ -> decoder
+```
+
+含义：
+
+- `early_feature [B, C_s, T_s]` 的 `T_s` 通常高于 latent 的 `T`；
+- 该层最接近用户关于 waveform-proximal context 的假设；
+- 它需要重构 SEANet stage 边界，工程风险高，排在 representation export、code prior、latent 和 post-RVQ 之后。
+
+## Causality 与可比较性
+
+- `context.causal=true`：`x_ctx[:, :, t]` 只能依赖 `x[:, :, <=t]`，适合 streaming claim。
+- `context.causal=false`：`x_ctx[:, :, t]` 可以依赖整段 utterance，适合 offline fidelity / RD claim。
+- causal 和 non-causal 结果不能放在同一行直接比较，必须在结果表中记录 `context_causal`。
+- 当前 SEANet 使用对称/reflect padding，整体更接近 offline baseline。若要写 streaming claim，必须单独建立 causal baseline。
+
+下面这些不算合法的“插入时间序列建模”：
+
+- 改变 sample rate、frame rate、codebook size、RVQ stage 数或 loss recipe；
+- 只把 encoder/decoder 整体加宽加深，却没有固定边界的 `x -> x_ctx` 对照；
+- post-RVQ refiner 发送额外 side channel；
+- 用 code prior 的 entropy 改善来宣称 reconstruction fidelity 改善；
+- 只比较 Mamba 和 no-context，而没有 matched TCN/LSTM/Transformer baseline。
+
 ## 最小实验矩阵
 
 第一轮只用 `configs/ablation-adversarial-msstft-balanced-4kbps.json` 作为主实现锚点。代码稳定后再复制到 `2 / 8 / 12 kbps` ladder。
@@ -51,6 +175,8 @@ context.num_layers: int
 context.kernel_size: int
 context.dropout: float
 ```
+
+所有 codec 内 context module 都必须是同形状 residual mixer。它不是新的 encoder、decoder 或 quantizer，也不能单独改变 payload accounting。
 
 新增模块建议：
 
