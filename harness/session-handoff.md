@@ -7,102 +7,102 @@ Last reviewed: 2026-05-06
 ## 仓库状态
 
 - 分支：`feat/context-modeling`
-- 已有提交：
-  - `8c54781 docs: define context modeling research baseline`
-  - `11e4bf3 docs: add context modeling research intake`
-  - `9faade8 docs: define context modeling experiment plan`
-  - `267c771 docs: clarify temporal context insertion semantics`
-  - `b57556e docs: refocus context modeling on long-range redundancy`
-  - `705a275 docs: define long-range redundancy research theme`
-  - `51a8b09 docs: add long-range redundancy research refresh`
-  - `bf45862 docs: define long-range redundancy implementation spec`
-  - `d242624 feat(evals): export codec representations for diagnostics`
-  - `6ec80f2 feat(evals): add frozen representation diagnostics`
-  - `ebb6077 feat(evals): add analytic code prior entropy baselines`
-  - `0120f6e feat(evals): add trained code prior baselines`
+- 最近提交：
+  - `1536616 feat(evals): collect context modeling results`
   - `3ccbbd1 chore(evals): add context prior pipeline script`
-- 当前待提交目标：实现结果聚合脚本，统一 diagnostics、analytic prior 和 trained prior 输出，并给出 go/no-go。
+  - `0120f6e feat(evals): add trained code prior baselines`
+  - `ebb6077 feat(evals): add analytic code prior entropy baselines`
+  - `6ec80f2 feat(evals): add frozen representation diagnostics`
+  - `d242624 feat(evals): export codec representations for diagnostics`
+  - `bf45862 docs: define long-range redundancy implementation spec`
+- 本轮目标：新增轻量结果包脚本，并让一键 context prior pipeline 在训练、聚合结束后默认调用它。
 - 本轮新增/修改范围：
-  - added: `evals/scripts/collect_context_results.py`
+  - added: `scripts/pack-context-results.sh`
   - modified: `scripts/run-context-prior-pipeline.sh`
   - modified: `tests/test_evals_scripts.py`
+  - modified: `README.md`
+  - modified: `docs/overview.md`
   - modified: `evals/README.md`
   - modified: `init.sh`
   - modified: `plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md`
+  - modified: `harness/bootstrap-contract.md`
   - modified: `harness/feature_list.json`
   - modified: `harness/progress.md`
+  - modified: `harness/quality.md`
   - modified: `harness/session-handoff.md`
 
 ## 当前已验证状态
 
-- `./init.sh` 通过，并打印新的 Phase 1 / Phase 2 / Phase 3 / pipeline / result collection 当前阶段提示。
+- `./init.sh` 通过，并打印轻量结果包当前阶段提示。
 - `./scripts/harness-check.sh` 通过，0 warnings。
 - `git diff --check` 通过。
 - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
-- `python3 -m py_compile evals/scripts/collect_context_results.py` 通过。
-- `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/collect_context_results.py --help` 通过。
-- `scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --max-items 1 --train-steps 1 --dry-run` 通过，并包含 `collect_context_results.py`。
-- `scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --export-dir /tmp/custom-export --max-items 1 --train-steps 1 --dry-run` 通过，并确认 collect stage 使用 `--prior-root /tmp/context-pipeline/priors`。
+- `bash -n scripts/pack-context-results.sh` 通过。
+- `bash -n scripts/run-context-prior-pipeline.sh` 通过。
+- `scripts/pack-context-results.sh --output-root /tmp/context-pipeline --export-dir /tmp/custom-export --bundle-dir /tmp/context-bundle --dry-run` 通过；无真实输出时只报告 missing，不创建 bundle。
+- `scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --export-dir /tmp/custom-export --max-items 1 --train-steps 1 --bundle-dir /tmp/context-bundle --dry-run` 通过，并包含 pack stage。
 - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
-- `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，16 tests OK。
-- `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，35 tests OK。
+- `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，18 tests OK。
+- `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，37 tests OK。
 
 ## 本会话改动
 
-- 新增 `evals/scripts/collect_context_results.py`：
-  - 默认读取 `export_dir/diagnostics/summary.json`；
-  - 默认读取 `export_dir/code_priors/summary.json`；
-  - 默认读取 `export_dir.parent/priors/local-tcn/summary.json` 和 `export_dir.parent/priors/long-transformer/summary.json`；
-  - 输出 `results.jsonl`、`summary.csv` 和 `summary.json`。
-- 统一结果字段包括：
-  - `stage`；
-  - `representation`；
-  - `prior_family`；
-  - `context_scope`；
-  - `bits_per_code`；
-  - `estimated_entropy_bitrate_kbps`；
-  - `entropy_savings_ratio`；
-  - `relative_improvement_vs_local_or_unigram`；
-  - `gate_passed`。
-- `summary.json` 新增 `go_no_go`：
-  - diagnostics gate 通过；
-  - long/full prior 相比最佳 local/unigram reference 通过；
-  - 两者同时满足才建议进入 codec context training。
-- `scripts/run-context-prior-pipeline.sh` 已在最后自动调用结果聚合脚本。
-- `tests/test_evals_scripts.py` 新增 synthetic summary 测试，覆盖结果表输出和 go/no-go 判定。
-- `evals/README.md`、active spec、init 和 harness 已同步为结果聚合已实现。
+- 新增 `scripts/pack-context-results.sh`：
+  - 默认读取 `evals/outputs/context-modeling`；
+  - 默认打包到 `evals/outputs/context-modeling/download-bundles/<timestamp>/`；
+  - 可用 `--bundle-dir` 固定训练机下载路径；
+  - 写入 `BUNDLE_MANIFEST.txt`，记录来源目录、git commit、复制项、missing 项和排除范围。
+- 打包脚本采用白名单复制：
+  - export root: `manifest.jsonl`、`run.json`；
+  - diagnostics: `summary.json`、`diagnostics.jsonl`；
+  - analytic/trained code prior: `summary.json`、`config.json`、`train_metrics.jsonl`、`val_metrics.jsonl`；
+  - results: `results.jsonl`、`summary.csv`、`summary.json`。
+- 明确不复制：
+  - trained prior `checkpoint.pt`；
+  - `representations/*.pt`；
+  - `reconstructions/*.wav`；
+  - compressed audio outputs。
+- `scripts/run-context-prior-pipeline.sh` 现在在 collect stage 后默认调用打包脚本，并支持：
+  - `--skip-pack-results`
+  - `--bundle-dir`
+  - `--bundle-root`
+  - `--bundle-run-id`
+- `tests/test_evals_scripts.py` 新增轻量打包测试，覆盖实际复制和 dry-run 不落盘。
+- README、overview、evals README、active spec、init 和 harness 已同步为“pipeline + result collection + lightweight bundle”阶段。
 
 ## 本会话决策
 
-- Go/no-go 不只看 prior：必须同时满足 representation diagnostics 和 code-prior long/full gate，避免只用 code entropy 结果跳到 codec context training。
-- Long prior 的 reference 默认是最佳 local prior；若 local prior 缺失，退回 unigram。
-- Pipeline 现在可以直接作为真实 4kbps checkpoint 的第一轮程序化 sanity 入口。
+- 训练机原始输出目录仍保留完整结果和 checkpoint；轻量下载包只是额外产物，不改变原始目录结构。
+- 默认分析只下载轻量包；除非要复现实验或继续训练，不默认下载 prior checkpoint、representation tensor 或 reconstruction wav。
+- Pipeline 的 pack stage 可以被 `--skip-pack-results` 关闭，方便只跑原始实验输出。
+- macOS 的 `KMP_DUPLICATE_LIB_OK=TRUE` 仍只用于本地验证，不写入 Linux 训练命令。
 
 ## 仍损坏或未验证
 
-- 未用真实 4kbps checkpoint 和可访问的 long/full utterance manifest 跑完整 pipeline；当前只验证 synthetic summary 与 dry-run。
-- 未在本轮运行真实训练 smoke。
+- 未用真实 4kbps checkpoint 和可访问的 long/full utterance manifest 跑完整 pipeline；当前只验证 synthetic output 和 dry-run。
 - 未在 Linux `4 x A100` 训练机重新验证 smoke。
+- 未验证真实长音频输出目录的轻量包大小；白名单策略应避免 heavy artifact，但实际大小仍取决于 manifest 和 metrics 行数。
 - Mamba/SSM 依赖尚未固定。
-- macOS 本地完整单测仍依赖 `KMP_DUPLICATE_LIB_OK=TRUE` workaround；这不应进入 Linux 训练命令。
 
 ## 清洁状态
 
-- 本轮最终验证已完成，当前等待提交。
-- 临时工件：本轮未创建模型输出、训练日志、下载缓存或调试脚本。
+- 本轮最终验证已完成。
+- 未创建需要清理的模型输出、训练日志、下载缓存或调试脚本。
+- 如果工作区不是 clean，优先检查本轮列出的文件；不要回退用户未授权的改动。
 
 ## 下一步最佳动作
 
-当真实 4kbps checkpoint 和 long/full utterance manifest 可访问时，运行 `scripts/run-context-prior-pipeline.sh` 做完整 sanity，然后查看 `results/summary.json` 的 `go_no_go`。如果 Linux 训练机仍不可用，可以先准备真实 manifest / checkpoint 路径配置文档。
+把仓库 clone 到 Linux 训练机后，用真实 4kbps checkpoint 和 long/full utterance manifest 运行 `scripts/run-context-prior-pipeline.sh`。训练结束后先下载 `download-bundles/<timestamp>/` 或 `--bundle-dir` 指定的轻量结果目录，查看 `results/summary.json` 的 `go_no_go`，再决定是否进入 Phase 4 codec context training。
 
 ## 命令
 
 - 初始化：`./init.sh`
 - Harness 检查：`./scripts/harness-check.sh`
-- 聚焦验证：`git diff --check`
-- Collect CLI sanity：`conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/collect_context_results.py --help`
+- 静态检查：`git diff --check`
+- Pack syntax：`bash -n scripts/pack-context-results.sh`
 - Pipeline syntax：`bash -n scripts/run-context-prior-pipeline.sh`
-- Pipeline dry-run：`scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --max-items 1 --train-steps 1 --dry-run`
+- Pack dry-run：`scripts/pack-context-results.sh --output-root /tmp/context-pipeline --export-dir /tmp/custom-export --bundle-dir /tmp/context-bundle --dry-run`
+- Pipeline dry-run：`scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --export-dir /tmp/custom-export --max-items 1 --train-steps 1 --bundle-dir /tmp/context-bundle --dry-run`
 - Focused tests：`conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v`
 - CLI sanity：`conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help`
 - 完整验证：`conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v`

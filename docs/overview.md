@@ -1,6 +1,6 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-05-05
+Last reviewed: 2026-05-06
 
 # AudioCodec 项目总览
 
@@ -60,12 +60,11 @@ waveform -> SEANet encoder -> downsampled latent -> EMA RVQ -> RVQ codes -> quan
 
 ## 当前下一步
 
-当前 idea 已基本明确。下一步是一阶段研究收集和实验准备：
+当前 idea 和 E0-E2 go/no-go 工具链已基本成形。下一步是把仓库 clone 到 Linux 训练机，用真实 checkpoint 和 long/full utterance manifest 跑一键 pipeline：
 
-- 继续维护 `docs/research/context-modeling-intake.md` 中的论文和代码收集；
-- 以 `docs/research/context-modeling-experiment-plan.md` 为下一阶段实现入口；
-- 把 local conv/TCN 作为控制组，而不是主要贡献；
-- 先实现 representation export、code-prior entropy baseline 和 latent/post-RVQ context smoke；
-- 暂缓 SEANet early feature 拆分，等导出、结果表和 matched baseline 工具链稳定后再做。
+- `scripts/run-context-prior-pipeline.sh` 串起 representation export、frozen diagnostics、analytic prior、trained local/long prior、结果聚合和轻量结果包；
+- `scripts/pack-context-results.sh` 会生成只包含分析所需 `summary / metrics / manifest / run metadata` 的可下载目录；
+- 训练 checkpoint、representation tensor 和 reconstruction wav 默认保留在原始输出目录，不进入轻量下载包；
+- 先看 `results/summary.json` 的 `go_no_go`，再决定是否进入 Phase 4 codec context training。
 
 实现应服务于这个对照，而不是提前预设某个层级或某个模型族一定获胜。

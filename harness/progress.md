@@ -193,3 +193,25 @@ Last reviewed: 2026-05-06
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，16 tests OK。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，35 tests OK。
+- 用户确认应准备一个可下载的轻量结果目录，并希望一键训练脚本在训练结束后自动调用打包脚本。
+- 轻量结果包脚本实现完成：
+  - 新增 `scripts/pack-context-results.sh`，从 context pipeline 输出中白名单复制 `manifest.jsonl`、`run.json`、diagnostics/code-prior/results 的 `summary / metrics / config` 文件；
+  - 默认输出到 `evals/outputs/context-modeling/download-bundles/<timestamp>/`，并写入 `BUNDLE_MANIFEST.txt`；
+  - 明确排除 `checkpoint.pt`、`*.pt` representation tensor、reconstruction wav 和压缩音频，避免下载包变重；
+  - `scripts/run-context-prior-pipeline.sh` 已在结果聚合后默认调用打包脚本，并支持 `--skip-pack-results`、`--bundle-dir`、`--bundle-root` 和 `--bundle-run-id`。
+- 新增测试覆盖：
+  - pipeline dry-run 现在包含 pack stage；
+  - synthetic output 的轻量打包会复制分析文件但不复制 checkpoint/tensor/wav；
+  - `--dry-run` 不创建 bundle 目录。
+- 本轮轻量打包验证：
+  - `./init.sh` 通过，并打印轻量结果包当前阶段提示。
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `bash -n scripts/pack-context-results.sh` 通过。
+  - `bash -n scripts/run-context-prior-pipeline.sh` 通过。
+  - `scripts/pack-context-results.sh --output-root /tmp/context-pipeline --export-dir /tmp/custom-export --bundle-dir /tmp/context-bundle --dry-run` 通过。
+  - `scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --export-dir /tmp/custom-export --max-items 1 --train-steps 1 --bundle-dir /tmp/context-bundle --dry-run` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，18 tests OK。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，37 tests OK。

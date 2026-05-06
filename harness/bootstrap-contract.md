@@ -5,7 +5,7 @@
 
 Owner: ely
 Status: active
-Last reviewed: 2026-05-05
+Last reviewed: 2026-05-06
 
 # 初始化契约
 
@@ -53,4 +53,4 @@ PYTHONPATH=src python scripts/train_codec.py --config configs/ablation-adversari
 - 当前 macOS 开发机完整单测需要 `KMP_DUPLICATE_LIB_OK=TRUE` 绕过 OpenMP runtime 冲突；这不是 Linux A100 训练命令的一部分。
 - 尚未在本轮运行真实训练 smoke。
 - Mamba/SSM 依赖尚未固定；只有 long-context diagnostics 通过 gate 后才评估是否引入 Mamba。
-- 研究收集和方向定义已完成；当前 active item 是 `long-range-redundancy-diagnostics-and-context-route`，下一步是 Phase 1 representation export。
+- 研究收集、方向定义和 E0-E2 本地工具链已完成；当前 active item 是 `long-range-redundancy-diagnostics-and-context-route`，下一步是在训练机用真实 checkpoint/manifest 跑 pipeline，并下载轻量结果包分析。

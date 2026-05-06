@@ -482,6 +482,8 @@ class ContextPriorPipelineTest(unittest.TestCase):
                 "1",
                 "--train-steps",
                 "1",
+                "--bundle-dir",
+                "/tmp/context-bundle",
                 "--dry-run",
             ],
             cwd=root,
@@ -495,9 +497,128 @@ class ContextPriorPipelineTest(unittest.TestCase):
         self.assertIn("evaluate_code_priors.py", result.stdout)
         self.assertIn("train_code_prior.py", result.stdout)
         self.assertIn("collect_context_results.py", result.stdout)
+        self.assertIn("pack-context-results.sh", result.stdout)
         self.assertIn("local_tcn", result.stdout)
         self.assertIn("long_transformer", result.stdout)
         self.assertIn("--prior-root /tmp/context-pipeline/priors", result.stdout)
+        self.assertIn("--bundle-dir /tmp/context-bundle", result.stdout)
+
+
+class ContextResultsBundleTest(unittest.TestCase):
+    def _write_context_outputs(self, output_root: Path) -> tuple[Path, Path, Path]:
+        export_dir = output_root / "neural-4k-export"
+        results_dir = output_root / "results"
+        prior_root = output_root / "priors"
+        analytic_dir = export_dir / "code_priors"
+        diagnostics_dir = export_dir / "diagnostics"
+        local_dir = prior_root / "local-tcn"
+        long_dir = prior_root / "long-transformer"
+        heavy_dirs = [
+            export_dir / "representations",
+            export_dir / "reconstructions",
+            local_dir,
+            long_dir,
+            analytic_dir,
+            diagnostics_dir,
+            results_dir,
+        ]
+        for directory in heavy_dirs:
+            directory.mkdir(parents=True, exist_ok=True)
+
+        (export_dir / "manifest.jsonl").write_text('{"id": "utt"}\n')
+        (export_dir / "run.json").write_text("{}\n")
+        (diagnostics_dir / "summary.json").write_text("{}\n")
+        (diagnostics_dir / "diagnostics.jsonl").write_text('{"stage": "diagnostics"}\n')
+        for directory in [analytic_dir, local_dir, long_dir]:
+            (directory / "summary.json").write_text("{}\n")
+            (directory / "config.json").write_text("{}\n")
+            (directory / "train_metrics.jsonl").write_text('{"split": "train"}\n')
+            (directory / "val_metrics.jsonl").write_text('{"split": "val"}\n')
+        (results_dir / "results.jsonl").write_text('{"stage": "result"}\n')
+        (results_dir / "summary.csv").write_text("stage\nresult\n")
+        (results_dir / "summary.json").write_text("{}\n")
+
+        (export_dir / "representations" / "utt.codes.pt").write_text("heavy tensor\n")
+        (export_dir / "reconstructions" / "utt.wav").write_text("heavy wav\n")
+        (local_dir / "checkpoint.pt").write_text("heavy checkpoint\n")
+        (long_dir / "checkpoint.pt").write_text("heavy checkpoint\n")
+        return export_dir, results_dir, prior_root
+
+    def test_pack_context_results_copies_only_lightweight_files(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = root / "scripts" / "pack-context-results.sh"
+        with tempfile.TemporaryDirectory() as tempdir:
+            temp_root = Path(tempdir)
+            output_root = temp_root / "context"
+            export_dir, results_dir, prior_root = self._write_context_outputs(output_root)
+            bundle_dir = temp_root / "bundle"
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(script),
+                    "--output-root",
+                    str(output_root),
+                    "--export-dir",
+                    str(export_dir),
+                    "--results-dir",
+                    str(results_dir),
+                    "--prior-root",
+                    str(prior_root),
+                    "--bundle-dir",
+                    str(bundle_dir),
+                ],
+                cwd=root,
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertIn("Wrote lightweight context results bundle", result.stdout)
+            self.assertTrue((bundle_dir / "BUNDLE_MANIFEST.txt").exists())
+            self.assertTrue((bundle_dir / "neural-4k-export" / "manifest.jsonl").exists())
+            self.assertTrue((bundle_dir / "neural-4k-export" / "diagnostics" / "summary.json").exists())
+            self.assertTrue((bundle_dir / "neural-4k-export" / "code_priors" / "summary.json").exists())
+            self.assertTrue((bundle_dir / "results" / "summary.csv").exists())
+            self.assertTrue((bundle_dir / "priors" / "local-tcn" / "summary.json").exists())
+            self.assertTrue((bundle_dir / "priors" / "long-transformer" / "val_metrics.jsonl").exists())
+            self.assertFalse((bundle_dir / "neural-4k-export" / "representations" / "utt.codes.pt").exists())
+            self.assertFalse((bundle_dir / "neural-4k-export" / "reconstructions" / "utt.wav").exists())
+            self.assertFalse((bundle_dir / "priors" / "local-tcn" / "checkpoint.pt").exists())
+
+    def test_pack_context_results_dry_run_does_not_create_bundle(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = root / "scripts" / "pack-context-results.sh"
+        with tempfile.TemporaryDirectory() as tempdir:
+            temp_root = Path(tempdir)
+            output_root = temp_root / "context"
+            export_dir, results_dir, prior_root = self._write_context_outputs(output_root)
+            bundle_dir = temp_root / "dry-bundle"
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(script),
+                    "--output-root",
+                    str(output_root),
+                    "--export-dir",
+                    str(export_dir),
+                    "--results-dir",
+                    str(results_dir),
+                    "--prior-root",
+                    str(prior_root),
+                    "--bundle-dir",
+                    str(bundle_dir),
+                    "--dry-run",
+                ],
+                cwd=root,
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertIn("[dry-run] copy", result.stdout)
+            self.assertFalse(bundle_dir.exists())
 
 
 class ContextResultsCollectionTest(unittest.TestCase):

@@ -5,13 +5,13 @@
 
 Owner: ely
 Status: active
-Last reviewed: 2026-05-05
+Last reviewed: 2026-05-06
 
 # Harness 质量
 
 ## 快照
 
-- 上次审查：2026-05-05
+- 上次审查：2026-05-06
 - 审查者：Codex
 - 总体状态：active harness refresh
 
@@ -28,7 +28,7 @@ Last reviewed: 2026-05-05
 
 ## 维护队列
 
-- Phase 1 完成后，把 representation export schema 和验证证据沉淀到 active spec、progress 和 handoff。
+- 训练机跑完真实 pipeline 后，把 `results/summary.json` 的 go/no-go、轻量结果包路径和未下载的重文件范围沉淀到 active spec、progress 和 handoff。
 - 若新增代码路径，补对应单测或 smoke，并把验证命令写入 feature item。
 - 若再次出现 agent 忘记更新 progress/handoff，优先增强 `scripts/harness-check.sh` 或任务完成 checklist。
 - 若 `AGENTS.md` 超过 150 行，把专题规则迁移到 `docs/` 或 `harness/`。

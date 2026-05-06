@@ -91,7 +91,7 @@ PYTHONPATH=src python evals/scripts/collect_context_results.py \
 
 该脚本输出 `results.jsonl`、`summary.csv` 和 `summary.json`，统一记录 `stage`、`representation`、`prior_family`、`context_scope`、`bits_per_code`、`estimated_entropy_bitrate_kbps`、`entropy_savings_ratio`、`relative_improvement_vs_local_or_unigram` 和 `gate_passed`。`summary.json` 中的 `go_no_go` 用于判断是否进入 codec context training。
 
-完整 pipeline 可用一个 bash 脚本串起 export、diagnostics、analytic prior 和 trained prior：
+完整 pipeline 可用一个 bash 脚本串起 export、diagnostics、analytic prior、trained prior、结果聚合和轻量打包：
 
 ```bash
 scripts/run-context-prior-pipeline.sh \
@@ -104,7 +104,17 @@ scripts/run-context-prior-pipeline.sh \
   --train-batch-size 8
 ```
 
-本机没有真实 checkpoint 时可先用 `--dry-run` 验证命令拼装。Pipeline 最后会自动调用结果聚合脚本。Linux 训练命令不要写入 macOS 的 `KMP_DUPLICATE_LIB_OK=TRUE` workaround。
+本机没有真实 checkpoint 时可先用 `--dry-run` 验证命令拼装。Pipeline 会在训练后自动调用结果聚合和轻量打包脚本。Linux 训练命令不要写入 macOS 的 `KMP_DUPLICATE_LIB_OK=TRUE` workaround。
+
+训练输出目录会包含 trained prior 的 `checkpoint.pt`、representation tensor 和 reconstruction wav。分析时默认不需要下载这些重文件；pipeline 末尾会自动调用轻量打包脚本：
+
+```bash
+scripts/pack-context-results.sh \
+  --output-root evals/outputs/context-modeling \
+  --export-dir evals/outputs/context-modeling/neural-4k-export
+```
+
+默认输出到 `evals/outputs/context-modeling/download-bundles/<timestamp>/`。这个目录只白名单复制 `manifest.jsonl`、`run.json`、diagnostics/code-prior/results 的 `summary.json`、`summary.csv`、`results.jsonl`、`train_metrics.jsonl`、`val_metrics.jsonl` 和 `config.json`，并写入 `BUNDLE_MANIFEST.txt`。它不会复制 `checkpoint.pt`、`*.pt` representation tensor、reconstruction wav 或压缩音频。若训练机下载路径需要固定，可在 pipeline 中使用 `--bundle-dir /path/to/download-bundle`；若只想保留原始输出，可用 `--skip-pack-results`。
 
 完整命令见：
 

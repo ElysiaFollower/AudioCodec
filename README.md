@@ -1,6 +1,6 @@
 Owner: ely
 Status: active
-Last reviewed: 2026-05-05
+Last reviewed: 2026-05-06
 
 # AudioCodec
 
@@ -9,7 +9,7 @@ Last reviewed: 2026-05-05
 - 当前科研目标：研究 neural speech codec 已经具备局部时序建模后，语音中是否仍存在可利用的长程时间冗余；如果存在，它在 `waveform -> downsampled latent -> RVQ embedding/codes -> code sequence/prior` 哪个表示层级最容易转化为同码率质量收益、entropy-coded bitrate 收益或长音频 token modeling 效率收益。
 - 当前工程基底：已经完成 `SEANet + EMA RVQ` speech codec baseline，并已有 `2 / 4 / 8 / 12 kbps` neural ladder 与传统 codec benchmark。
 - 当前方法立场：Mamba 是 selective SSM 候选模型，不是唯一假设；后续实验必须同时比较 `TCN / LSTM / Transformer / Mamba` 等上下文模型。
-- 当前阶段：一阶段先调研并收集 idea 相关研究与代码，整理证据和实验准备，再进入开发实现。
+- 当前阶段：Phase 1 representation export、Phase 2 frozen diagnostics、Phase 3 analytic/trained code-prior、统一 pipeline、结果聚合和轻量结果包脚本已实现；下一步是在 Linux 训练机用真实 checkpoint/manifest 跑一键 sanity，并下载轻量结果包分析。
 
 建议先读当前科研主线：
 
@@ -85,3 +85,7 @@ python scripts/train_codec.py --dataset-root /path/to/LibriSpeech/dev-clean --sm
 
 - `evals/`
   承载传统 codec baseline、benchmark 脚本和结果汇总，避免与 `src/` 的主训练代码耦合。
+- `scripts/run-context-prior-pipeline.sh`
+  串起长程冗余诊断流水线，并在末尾默认调用轻量打包脚本。
+- `scripts/pack-context-results.sh`
+  从 pipeline 输出中白名单复制 `summary / metrics / manifest / run metadata`，生成可下载的小目录；不会复制 `checkpoint.pt`、representation tensor 或 reconstruction wav。

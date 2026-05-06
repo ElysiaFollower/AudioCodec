@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run the fixed-frame long-range redundancy pipeline:
-# export representations -> frozen diagnostics -> analytic code priors -> trained code priors.
+# export representations -> frozen diagnostics -> analytic code priors -> trained code priors -> result bundle.
 
 set -euo pipefail
 
@@ -29,6 +29,10 @@ run_diagnostics=1
 run_analytic_prior=1
 run_trained_priors=1
 run_collect_results=1
+run_pack_results=1
+bundle_root=""
+bundle_dir=""
+bundle_run_id=""
 dry_run=0
 
 usage() {
@@ -58,12 +62,18 @@ Training prior options:
   --train-eval-every N             Default: 100.
   --train-device DEVICE            Default: auto.
 
+Result bundle options:
+  --bundle-root DIR                Bundle root, default: output-root/download-bundles.
+  --bundle-dir DIR                 Exact bundle dir for lightweight downloadable results.
+  --bundle-run-id ID               Bundle subdir name when --bundle-dir is not set.
+
 Stage switches:
   --skip-export
   --skip-diagnostics
   --skip-analytic-prior
   --skip-trained-priors
   --skip-collect-results
+  --skip-pack-results
   --dry-run                        Print commands without running them.
 
 Environment:
@@ -172,6 +182,21 @@ while [ "$#" -gt 0 ]; do
       train_device=$2
       shift 2
       ;;
+    --bundle-root)
+      require_value "$1" "${2:-}"
+      bundle_root=$2
+      shift 2
+      ;;
+    --bundle-dir)
+      require_value "$1" "${2:-}"
+      bundle_dir=$2
+      shift 2
+      ;;
+    --bundle-run-id)
+      require_value "$1" "${2:-}"
+      bundle_run_id=$2
+      shift 2
+      ;;
     --skip-export)
       run_export=0
       shift
@@ -190,6 +215,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-collect-results)
       run_collect_results=0
+      shift
+      ;;
+    --skip-pack-results)
+      run_pack_results=0
       shift
       ;;
     --dry-run)
@@ -292,6 +321,22 @@ collect_results_cmd=(
   --output-dir "$output_root/results"
   --prior-root "$output_root/priors"
 )
+pack_results_cmd=(
+  "scripts/pack-context-results.sh"
+  --output-root "$output_root"
+  --export-dir "$export_dir"
+  --results-dir "$output_root/results"
+  --prior-root "$output_root/priors"
+)
+if [ -n "$bundle_root" ]; then
+  pack_results_cmd+=(--bundle-root "$bundle_root")
+fi
+if [ -n "$bundle_dir" ]; then
+  pack_results_cmd+=(--bundle-dir "$bundle_dir")
+fi
+if [ -n "$bundle_run_id" ]; then
+  pack_results_cmd+=(--run-id "$bundle_run_id")
+fi
 if [ -n "$max_items" ]; then
   local_tcn_cmd+=(--max-train-items "$max_items" --max-eval-items "$max_items")
   long_transformer_cmd+=(--max-train-items "$max_items" --max-eval-items "$max_items")
@@ -312,4 +357,7 @@ if [ "$run_trained_priors" -eq 1 ]; then
 fi
 if [ "$run_collect_results" -eq 1 ]; then
   run_cmd "${collect_results_cmd[@]}"
+fi
+if [ "$run_pack_results" -eq 1 ]; then
+  run_cmd "${pack_results_cmd[@]}"
 fi

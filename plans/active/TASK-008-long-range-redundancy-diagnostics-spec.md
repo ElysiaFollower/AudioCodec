@@ -113,9 +113,10 @@ Last reviewed: 2026-05-06
 - `mamba` 仍未进入主线；当前脚本不引入 SSM 依赖。
 - `tests/test_evals_scripts.py` 已覆盖 synthetic RVQ codes 的 `local_tcn` training metrics 和 `long_transformer` smoke。
 - `scripts/run-context-prior-pipeline.sh` 已串起 Phase 1 export、Phase 2 diagnostics、Phase 3 analytic prior 和 trained local/long prior。
-- Pipeline 支持 `--dry-run`，可在没有真实 checkpoint 时验证命令拼装。
+- Pipeline 支持 `--dry-run`，可在没有真实 checkpoint 时验证命令拼装；真实运行时末尾默认调用轻量结果包脚本。
 - `evals/scripts/collect_context_results.py` 已支持读取 pipeline 输出并生成 `results.jsonl`、`summary.csv` 和 `summary.json`。
 - 结果聚合会记录 `relative_improvement_vs_local_or_unigram`、`gate_passed` 和 `go_no_go`，用于判断是否进入 codec context training。
+- `scripts/pack-context-results.sh` 已支持把 pipeline 输出白名单复制成可下载小目录，只包含 `manifest / run metadata / summary / metrics / results`，不复制 `checkpoint.pt`、representation tensor 或 reconstruction wav。
 
 实现任务：
 
@@ -132,6 +133,7 @@ Last reviewed: 2026-05-06
 - 报告 `bits_per_code`、`stage_bits_per_code`、`estimated_entropy_bitrate_kbps`、`entropy_savings_ratio`。
 - 不报告 reconstruction fidelity gain。
 - 达到 `>=5%` long-context improvement 才进入 Phase 4。
+- 训练机跑完后优先下载 `download-bundles/<timestamp>/` 轻量结果包；除非需要复现实验，不默认下载 prior checkpoint 或 representation tensor。
 
 ## Phase 4-6 实现与实验规格
 
@@ -182,6 +184,8 @@ Dynamic / variable frame-rate 是重要后续分支，但不是当前 fixed-fram
 ```bash
 ./scripts/harness-check.sh
 git diff --check
+bash -n scripts/pack-context-results.sh
+bash -n scripts/run-context-prior-pipeline.sh
 conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help
 conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v
 ```
@@ -190,4 +194,4 @@ macOS 上 `KMP_DUPLICATE_LIB_OK=TRUE` 只作为本地 OpenMP workaround，不进
 
 ## 下一步
 
-下一步优先用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 运行 `scripts/run-context-prior-pipeline.sh` 做真实 Phase 1 export + Phase 2 diagnostics + Phase 3 analytic/trained code-prior sanity，并查看 `results/summary.json` 的 `go_no_go`。Mamba 依赖未固定前不进入主线。
+下一步优先用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 运行 `scripts/run-context-prior-pipeline.sh` 做真实 Phase 1 export + Phase 2 diagnostics + Phase 3 analytic/trained code-prior sanity。训练结束后先查看 `results/summary.json` 的 `go_no_go`，并下载 pipeline 自动生成的轻量结果包；Mamba 依赖未固定前不进入主线。

@@ -77,7 +77,7 @@
       "priority": "P0",
       "area": "docs/plans/evals",
       "title": "长程时间冗余诊断与上下文建模实现路线",
-      "behavior": "围绕 docs/idea.md 的最新主题，用 active spec 定义 fixed-frame SEANet/RVQ baseline 上的 long-range redundancy diagnostics、code-prior entropy、latent/post-RVQ context training 和条件 dynamic frame-rate 分支；当前已实现 representation export、frozen representation diagnostics、analytic/trained code-prior、统一 pipeline 和结果聚合脚本。",
+      "behavior": "围绕 docs/idea.md 的最新主题，用 active spec 定义 fixed-frame SEANet/RVQ baseline 上的 long-range redundancy diagnostics、code-prior entropy、latent/post-RVQ context training 和条件 dynamic frame-rate 分支；当前已实现 representation export、frozen representation diagnostics、analytic/trained code-prior、统一 pipeline、结果聚合和轻量结果包脚本。",
       "status": "active",
       "verification": [
         "./scripts/harness-check.sh",
@@ -86,8 +86,10 @@
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/evaluate_code_priors.py --help",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/train_code_prior.py --help",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/collect_context_results.py --help",
+        "bash -n scripts/pack-context-results.sh",
         "bash -n scripts/run-context-prior-pipeline.sh",
         "scripts/run-context-prior-pipeline.sh --dry-run ...",
+        "scripts/pack-context-results.sh --dry-run ...",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v"
       ],
@@ -123,18 +125,23 @@
         "tests/test_evals_scripts.py 覆盖 pipeline dry-run 命令拼装",
         "evals/scripts/collect_context_results.py 已支持将 diagnostics、analytic prior、trained prior 汇总为 results.jsonl / summary.csv / summary.json",
         "tests/test_evals_scripts.py 覆盖 synthetic summary 的结果聚合与 go/no-go 判定",
+        "scripts/pack-context-results.sh 已支持把 pipeline 输出白名单复制成轻量下载目录，排除 checkpoint.pt、*.pt representation tensor 和 reconstruction wav",
+        "scripts/run-context-prior-pipeline.sh 已在末尾默认调用 pack-context-results.sh，并支持 --skip-pack-results / --bundle-dir / --bundle-root / --bundle-run-id",
+        "tests/test_evals_scripts.py 覆盖轻量结果包复制和 dry-run 不落盘",
         "./scripts/harness-check.sh passed: 0 warnings",
         "git diff --check passed",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/diagnose_representations.py --help passed",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/evaluate_code_priors.py --help passed",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/train_code_prior.py --help passed",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/collect_context_results.py --help passed",
+        "bash -n scripts/pack-context-results.sh passed",
         "bash -n scripts/run-context-prior-pipeline.sh passed",
         "scripts/run-context-prior-pipeline.sh --dry-run passed",
-        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v passed: 16 tests OK",
-        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 35 tests OK"
+        "scripts/pack-context-results.sh --dry-run passed",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v passed: 18 tests OK",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 37 tests OK"
       ],
-      "notes": "当前唯一 active item。Phase 1 export、Phase 2 diagnostics、Phase 3 analytic/trained code-prior、统一 pipeline 与结果聚合已实现；下一步用可访问的 long/full utterance manifest 和 4kbps checkpoint 跑真实 export+diagnostics+prior sanity，并查看 results/summary.json 的 go_no_go。"
+      "notes": "当前唯一 active item。Phase 1 export、Phase 2 diagnostics、Phase 3 analytic/trained code-prior、统一 pipeline、结果聚合与轻量结果包已实现；下一步用可访问的 long/full utterance manifest 和 4kbps checkpoint 在训练机跑真实 export+diagnostics+prior sanity，查看 results/summary.json 的 go_no_go，并下载轻量结果包。"
     }
   ]
 }
