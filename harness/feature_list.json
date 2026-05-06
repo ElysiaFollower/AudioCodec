@@ -129,6 +129,9 @@
         "scripts/pack-context-results.sh 默认复制前 3 对 source / reconstruction 试听音频，并支持 --audio-pairs / --skip-audio-pairs",
         "scripts/run-context-prior-pipeline.sh 已在末尾默认调用 pack-context-results.sh，并支持 --skip-pack-results / --bundle-dir / --bundle-root / --bundle-run-id / --audio-pairs",
         "tests/test_evals_scripts.py 覆盖轻量结果包复制、试听音频对、跳过试听音频和 dry-run 不落盘",
+        "scripts/run-context-prior-pipeline.sh 已改为 self-contained 默认入口：不传 manifest/checkpoint 时先构建 manifest、训练当前分支自己的 4kbps baseline，再运行 export/diagnostics/priors/pack",
+        "evals/scripts/build_manifest.py 支持 --dataset-root，使一键 pipeline 可以在训练机用实际数据路径覆盖 config 中的默认路径",
+        "harness/decisions.md 记录 context pipeline 必须自包含产出 baseline 资产，--checkpoint/--manifest 只作为显式复现或调试入口",
         "environment-linux-cuda.yaml 已新增 Linux A100 专用 conda 环境，固定 pytorch=2.5.1、torchaudio=2.5.1 和 pytorch-cuda=12.1，避免 pip torch 与 NCCL/CUDA 动态库混用",
         "README.md、init.sh、harness/bootstrap-contract.md 和 session handoff 已指向 audiocodec-cu121 作为训练机环境",
         "./scripts/harness-check.sh passed: 0 warnings",
@@ -141,12 +144,13 @@
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/collect_context_results.py --help passed",
         "bash -n scripts/pack-context-results.sh passed",
         "bash -n scripts/run-context-prior-pipeline.sh passed",
+        "scripts/run-context-prior-pipeline.sh --output-root /tmp/context-pipeline --max-items 1 --codec-steps 1 --train-steps 1 --dry-run passed",
         "scripts/run-context-prior-pipeline.sh --dry-run passed",
         "scripts/pack-context-results.sh --dry-run passed",
-        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v passed: 19 tests OK",
-        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 38 tests OK"
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v passed: 20 tests OK",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 39 tests OK"
       ],
-      "notes": "当前唯一 active item。Phase 1 export、Phase 2 diagnostics、Phase 3 analytic/trained code-prior、统一 pipeline、结果聚合与轻量结果包已实现；下一步用可访问的 long/full utterance manifest 和 4kbps checkpoint 在训练机跑真实 export+diagnostics+prior sanity，查看 results/summary.json 的 go_no_go，并下载轻量结果包。"
+      "notes": "当前唯一 active item。Phase 1 export、Phase 2 diagnostics、Phase 3 analytic/trained code-prior、统一 pipeline、结果聚合与轻量结果包已实现；pipeline 默认自包含构建 manifest 并训练当前分支自己的 4kbps baseline。下一步在训练机用 dataset-root 和 CUDA device 跑真实 self-contained sanity，查看 results/summary.json 的 go_no_go，并下载轻量结果包。"
     }
   ]
 }

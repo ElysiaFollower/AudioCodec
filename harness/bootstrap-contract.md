@@ -58,4 +58,4 @@ PYTHONPATH=src python scripts/train_codec.py --config configs/ablation-adversari
 - Linux A100 训练机必须使用 `environment-linux-cuda.yaml`；旧 `audiocodec` pip torch 环境曾出现 `libtorch_cuda.so` / NCCL symbol mismatch。
 - 尚未在新的 `audiocodec-cu121` Linux 环境运行真实训练 smoke。
 - Mamba/SSM 依赖尚未固定；只有 long-context diagnostics 通过 gate 后才评估是否引入 Mamba。
-- 研究收集、方向定义和 E0-E2 本地工具链已完成；当前 active item 是 `long-range-redundancy-diagnostics-and-context-route`，下一步是在训练机用真实 checkpoint/manifest 跑 pipeline，并下载轻量结果包分析。
+- 研究收集、方向定义和 E0-E2 本地工具链已完成；当前 active item 是 `long-range-redundancy-diagnostics-and-context-route`，下一步是在训练机运行 self-contained pipeline，由当前分支构建 manifest、训练 4kbps baseline、跑 diagnostics/priors，并下载轻量结果包分析。

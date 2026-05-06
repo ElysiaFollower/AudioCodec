@@ -35,3 +35,10 @@ Last reviewed: 2026-05-05
 - 原因：当前关键风险是研究边界、matched baseline、插入层级和指标定义不清，而不是缺少某个模块脚手架。
 - 否决方案：立即实现 Mamba-only codec、直接固定 latent/code-level context，或先扩展训练矩阵。
 - 后续约束：一阶段产物必须覆盖 early context、latent context、post-RVQ context、code-prior context，并明确 TCN/LSTM/Transformer/Mamba 的比较位置。
+
+### 2026-05-06 - Context pipeline 必须自包含产出 baseline 资产
+
+- 决策：`feat/context-modeling` 分支的长程冗余实验默认不依赖历史分支、本机旧目录或人工传入的 codec checkpoint；一键 pipeline 必须能从当前分支 config 构建 manifest，并在需要时训练自己的 fixed-frame 4kbps baseline checkpoint。
+- 原因：外部 checkpoint 可能来自旧代码、旧配置或不可追踪实验，无法保证与当前研究假设、导出 schema 和 benchmark accounting 匹配。
+- 否决方案：把 `/path/to/4kbps_checkpoint.pt` 作为用户必须替换的入口，或默认复用 `artifacts/` 下历史训练产物。
+- 后续约束：`--checkpoint` 和 `--manifest` 只能作为显式复现/调试入口；默认训练命令应只要求数据集路径、设备和输出目录。

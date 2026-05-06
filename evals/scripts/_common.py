@@ -184,8 +184,14 @@ def run_ffmpeg(args: list[str]) -> None:
     subprocess.run(command, check=True)
 
 
-def load_split_examples(config_path: str | Path, split: str) -> tuple[CodecExperimentConfig, list[AudioExample]]:
+def load_split_examples(
+    config_path: str | Path,
+    split: str,
+    dataset_root: str | Path | None = None,
+) -> tuple[CodecExperimentConfig, list[AudioExample]]:
     config = load_experiment_config(config_path)
+    if dataset_root is not None:
+        config.dataset.root = str(dataset_root)
     splits = build_librispeech_splits(
         root=config.dataset.root,
         train_minutes=config.dataset.train_minutes,

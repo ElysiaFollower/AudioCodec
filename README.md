@@ -7,9 +7,9 @@ Last reviewed: 2026-05-06
 本仓库用于推进一个面向 `speech` 的 neural codec / speech tokenizer 科研项目。
 
 - 当前科研目标：研究 neural speech codec 已经具备局部时序建模后，语音中是否仍存在可利用的长程时间冗余；如果存在，它在 `waveform -> downsampled latent -> RVQ embedding/codes -> code sequence/prior` 哪个表示层级最容易转化为同码率质量收益、entropy-coded bitrate 收益或长音频 token modeling 效率收益。
-- 当前工程基底：已经完成 `SEANet + EMA RVQ` speech codec baseline，并已有 `2 / 4 / 8 / 12 kbps` neural ladder 与传统 codec benchmark。
+- 当前工程基底：已经完成 `SEANet + EMA RVQ` speech codec 训练、导出和评测代码；当前分支的实验默认自己训练所需 4kbps baseline，不依赖历史分支或本地旧 checkpoint。
 - 当前方法立场：Mamba 是 selective SSM 候选模型，不是唯一假设；后续实验必须同时比较 `TCN / LSTM / Transformer / Mamba` 等上下文模型。
-- 当前阶段：Phase 1 representation export、Phase 2 frozen diagnostics、Phase 3 analytic/trained code-prior、统一 pipeline、结果聚合和轻量结果包脚本已实现；下一步是在 Linux 训练机用真实 checkpoint/manifest 跑一键 sanity，并下载轻量结果包分析。
+- 当前阶段：Phase 1 representation export、Phase 2 frozen diagnostics、Phase 3 analytic/trained code-prior、统一 pipeline、结果聚合和轻量结果包脚本已实现；一键脚本已改为先构建 manifest、必要时训练当前分支自己的 4kbps baseline，再继续诊断和打包。
 
 建议先读当前科研主线：
 
@@ -70,6 +70,43 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 ```bash
 python scripts/train_codec.py --dataset-root /path/to/LibriSpeech/dev-clean --smoke-test
 ```
+
+## 一键训练与诊断
+
+当前分支的主入口是 [scripts/run-context-prior-pipeline.sh](/Users/ely/workspace/research/audio/AudioCodec/scripts/run-context-prior-pipeline.sh)。默认不需要外部 `checkpoint` 或预先写好的 `manifest`：脚本会用 4kbps config 构建 test manifest，把 baseline codec 训练到 `evals/outputs/context-modeling/codec-baseline/checkpoints/best.pt`，然后继续 representation export、diagnostics、code-prior 训练、结果聚合和轻量打包。
+
+Linux A100 上建议先用 dry-run 看完整命令，再正式运行：
+
+```bash
+mkdir -p logs
+CUDA_VISIBLE_DEVICES=4 PYTHON_BIN=python scripts/run-context-prior-pipeline.sh \
+  --dataset-root /path/to/LibriSpeech/train-clean-100 \
+  --output-root evals/outputs/context-modeling \
+  --codec-device cuda \
+  --device cuda \
+  --train-device cuda \
+  --train-steps 1000 \
+  --train-sequence-length 512 \
+  --train-batch-size 8 \
+  --dry-run
+```
+
+去掉 `--dry-run` 后开始真实运行：
+
+```bash
+CUDA_VISIBLE_DEVICES=4 PYTHON_BIN=python scripts/run-context-prior-pipeline.sh \
+  --dataset-root /path/to/LibriSpeech/train-clean-100 \
+  --output-root evals/outputs/context-modeling \
+  --codec-device cuda \
+  --device cuda \
+  --train-device cuda \
+  --train-steps 1000 \
+  --train-sequence-length 512 \
+  --train-batch-size 8 \
+  2>&1 | tee logs/context-modeling-$(date +%Y%m%d-%H%M%S).log
+```
+
+如果 `evals/outputs/context-modeling/codec-baseline/checkpoints/best.pt` 已由同一次 self-contained pipeline 产出，脚本会复用它；换 `--output-root` 或加 `--force-codec-training` 可启动一套新的 baseline 训练。`--checkpoint` 和 `--manifest` 仍保留给复现实验使用，但默认路径不再依赖历史训练产物。
 
 ## 当前科研 Anchor
 

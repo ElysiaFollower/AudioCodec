@@ -253,3 +253,23 @@ Last reviewed: 2026-05-06
   - `git diff --check` 通过。
   - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
   - `python3` 解析 `environment.yaml` 和 `environment-linux-cuda.yaml` YAML 通过。
+- 用户决策：放弃依赖历史训练产物，`feat/context-modeling` 分支必须自包含完成实验资产；如果 context pipeline 需要 codec checkpoint，就由当前分支先训练一个。
+- 已将 `scripts/run-context-prior-pipeline.sh` 改为 self-contained 默认入口：
+  - 默认 `--config configs/ablation-adversarial-msstft-balanced-4kbps.json`；
+  - 不传 `--manifest` 时，先用 `evals/scripts/build_manifest.py` 构建 `output-root/manifests/test.jsonl`；
+  - 不传 `--checkpoint` 时，先用 `scripts/train_codec.py` 训练 baseline 到 `output-root/codec-baseline/checkpoints/best.pt`；
+  - 支持 `--dataset-root` 同时覆盖 manifest 构建和 codec 训练的数据根目录；
+  - 支持 `--codec-device`、`--codec-steps`、`--codec-smoke-test`、`--limit-train-examples`、`--resume-codec-from`、`--skip-codec-training`、`--force-codec-training` 等训练控制；
+  - 显式 `--checkpoint` / `--manifest` 仍可用于复现或调试，但不再是默认路径。
+- `evals/scripts/build_manifest.py` 已支持 `--dataset-root`，避免只依赖 config 中写死的机器路径。
+- README、evals README、overview、TASK-008、bootstrap contract 和 decisions 已同步 self-contained pipeline 语义。
+- 本轮 self-contained pipeline 验证：
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `bash -n scripts/run-context-prior-pipeline.sh` 通过。
+  - `bash -n scripts/pack-context-results.sh` 通过。
+  - `scripts/run-context-prior-pipeline.sh --output-root /tmp/context-pipeline --max-items 1 --codec-steps 1 --train-steps 1 --dry-run` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，20 tests OK。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，39 tests OK。

@@ -8,7 +8,7 @@ repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$repo_root"
 
 echo "项目：AudioCodec speech neural codec research workspace"
-echo "当前阶段：Phase 1 export、Phase 2 diagnostics、Phase 3 code-prior、pipeline、结果聚合与含试听对的轻量结果包已实现，下一步用真实 checkpoint/manifest 在训练机跑 sanity"
+echo "当前阶段：Phase 1 export、Phase 2 diagnostics、Phase 3 code-prior、pipeline、结果聚合与含试听对的轻量结果包已实现；一键脚本会自建 manifest 并训练当前分支自己的 4kbps baseline"
 echo "技术栈：Python 3.11, PyTorch, torchaudio, SEANet-style encoder/decoder, EMA RVQ, evals scripts"
 echo
 
@@ -36,11 +36,13 @@ conda activate audiocodec-cu121
 
 启动 / sanity：
 PYTHONPATH=src python scripts/train_codec.py --help
+scripts/run-context-prior-pipeline.sh --output-root /tmp/context-pipeline --codec-steps 1 --train-steps 1 --dry-run
 
 聚焦验证：
 ./scripts/harness-check.sh
 git diff --check
 bash -n scripts/pack-context-results.sh
+bash -n scripts/run-context-prior-pipeline.sh
 PYTHONPATH=src python scripts/train_codec.py --help
 
 完整验证：

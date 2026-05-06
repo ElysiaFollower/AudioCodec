@@ -91,20 +91,22 @@ PYTHONPATH=src python evals/scripts/collect_context_results.py \
 
 该脚本输出 `results.jsonl`、`summary.csv` 和 `summary.json`，统一记录 `stage`、`representation`、`prior_family`、`context_scope`、`bits_per_code`、`estimated_entropy_bitrate_kbps`、`entropy_savings_ratio`、`relative_improvement_vs_local_or_unigram` 和 `gate_passed`。`summary.json` 中的 `go_no_go` 用于判断是否进入 codec context training。
 
-完整 pipeline 可用一个 bash 脚本串起 export、diagnostics、analytic prior、trained prior、结果聚合和轻量打包：
+完整 pipeline 可用一个 bash 脚本串起 manifest 构建、baseline codec 训练、export、diagnostics、analytic prior、trained prior、结果聚合和轻量打包。默认入口是 self-contained 的：不传 `--manifest` 和 `--checkpoint` 时，会从当前 config 构建 manifest，并把 4kbps baseline 训练到 `output-root/codec-baseline/checkpoints/best.pt` 后再导出表示。
 
 ```bash
 scripts/run-context-prior-pipeline.sh \
-  --manifest evals/data/manifests/test.jsonl \
-  --checkpoint /path/to/checkpoint.pt \
+  --dataset-root /path/to/LibriSpeech/train-clean-100 \
   --output-root evals/outputs/context-modeling \
   --codec-label neural-4k \
+  --codec-device cuda \
+  --device cuda \
+  --train-device cuda \
   --train-steps 1000 \
   --train-sequence-length 512 \
   --train-batch-size 8
 ```
 
-本机没有真实 checkpoint 时可先用 `--dry-run` 验证命令拼装。Pipeline 会在训练后自动调用结果聚合和轻量打包脚本。Linux 训练命令不要写入 macOS 的 `KMP_DUPLICATE_LIB_OK=TRUE` workaround。
+正式运行前可先加 `--dry-run` 验证命令拼装。Pipeline 会在训练后自动调用结果聚合和轻量打包脚本。Linux 训练命令不要写入 macOS 的 `KMP_DUPLICATE_LIB_OK=TRUE` workaround。`--manifest` 和 `--checkpoint` 只用于复现或调试显式资产，不是默认训练路径。
 
 训练输出目录会包含 trained prior 的 `checkpoint.pt`、representation tensor 和 reconstruction wav。分析时默认不需要下载这些重文件；pipeline 末尾会自动调用轻量打包脚本：
 

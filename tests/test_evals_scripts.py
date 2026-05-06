@@ -464,6 +464,37 @@ class TrainCodePriorTest(unittest.TestCase):
 
 
 class ContextPriorPipelineTest(unittest.TestCase):
+    def test_pipeline_dry_run_builds_manifest_and_codec_by_default(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = root / "scripts" / "run-context-prior-pipeline.sh"
+        result = subprocess.run(
+            [
+                "bash",
+                str(script),
+                "--output-root",
+                "/tmp/context-pipeline",
+                "--max-items",
+                "1",
+                "--codec-steps",
+                "1",
+                "--train-steps",
+                "1",
+                "--dry-run",
+            ],
+            cwd=root,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertIn("evals/scripts/build_manifest.py", result.stdout)
+        self.assertIn("--output /tmp/context-pipeline/manifests/test.jsonl", result.stdout)
+        self.assertIn("scripts/train_codec.py", result.stdout)
+        self.assertIn("--config configs/ablation-adversarial-msstft-balanced-4kbps.json", result.stdout)
+        self.assertIn("--output-dir /tmp/context-pipeline/codec-baseline", result.stdout)
+        self.assertIn("--checkpoint /tmp/context-pipeline/codec-baseline/checkpoints/best.pt", result.stdout)
+        self.assertIn("export_neural_codec.py", result.stdout)
+
     def test_pipeline_dry_run_prints_all_stages(self) -> None:
         root = Path(__file__).resolve().parents[1]
         script = root / "scripts" / "run-context-prior-pipeline.sh"
