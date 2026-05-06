@@ -15,17 +15,9 @@ Last reviewed: 2026-05-06
   - `ebb6077 feat(evals): add analytic code prior entropy baselines`
   - `6ec80f2 feat(evals): add frozen representation diagnostics`
   - `d242624 feat(evals): export codec representations for diagnostics`
-- 本轮目标：让轻量结果包保留少量 source/reconstruction 试听对，同时继续避免下载包带上整批重文件。
+- 本轮目标：训练机开跑前确认 git hygiene，避免训练输出需要 commit 或造成后续同步冲突。
 - 本轮新增/修改范围：
-  - modified: `scripts/pack-context-results.sh`
-  - modified: `scripts/run-context-prior-pipeline.sh`
-  - modified: `tests/test_evals_scripts.py`
-  - modified: `README.md`
-  - modified: `docs/overview.md`
-  - modified: `evals/README.md`
-  - modified: `init.sh`
-  - modified: `plans/active/TASK-008-long-range-redundancy-diagnostics-spec.md`
-  - modified: `harness/feature_list.json`
+  - modified: `.gitignore`
   - modified: `harness/progress.md`
   - modified: `harness/session-handoff.md`
 
@@ -36,33 +28,25 @@ Last reviewed: 2026-05-06
 - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
 - `bash -n scripts/pack-context-results.sh` 通过。
 - `bash -n scripts/run-context-prior-pipeline.sh` 通过。
-- `scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --export-dir /tmp/custom-export --max-items 1 --train-steps 1 --bundle-dir /tmp/context-bundle --audio-pairs 1 --dry-run` 通过，并包含 pack stage 的 `--audio-pairs 1`。
+- `git check-ignore -v` 确认 `/artifacts/`、`evals/outputs/`、`/runs/`、`logs/`、`checkpoints/`、`outputs/`、`data/` 和 download bundle 下的样例文件会被忽略。
+- `git ls-files | rg '(^artifacts/|^evals/outputs/|^outputs/|^runs/|^logs/|^checkpoints/|^data/)'` 无输出，表示默认输出目录没有已跟踪文件。
 - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
 - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，19 tests OK。
 - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，38 tests OK。
 
 ## 本会话改动
 
-- `scripts/pack-context-results.sh` 现在默认从 export `manifest.jsonl` 解析前 3 条 `source_path / reconstruction_path`，复制到 `audio_pairs/001-<id>/source.*` 和 `audio_pairs/001-<id>/reconstruction.*`。
-- 新增 pack 参数：
-  - `--audio-pairs N`：调整试听对数量；
-  - `--skip-audio-pairs`：关闭试听音频复制。
-- `scripts/run-context-prior-pipeline.sh` 新增对应透传参数：
-  - `--audio-pairs N`；
-  - `--skip-audio-pairs`。
-- 下载包仍采用白名单：
-  - 复制 analysis metadata、summary、metrics、config、results；
-  - 复制少量试听音频对；
-  - 不复制 trained prior `checkpoint.pt`、`representations/*.pt`、整批 `reconstructions/*.wav` 或 compressed audio outputs。
-- `tests/test_evals_scripts.py` 已覆盖默认试听对复制、`--skip-audio-pairs`、dry-run 不落盘和 pipeline dry-run 透传。
-- README、overview、evals README、active spec、init 和 harness 已同步为“轻量结果包含试听音频对”。
+- `.gitignore` 已补充通用训练/评测产物保护：
+  - checkpoint/model tensor: `*.pt`、`*.pth`、`*.ckpt`、`*.safetensors`；
+  - generated audio/media: `*.wav`、`*.flac`、`*.mp3`、`*.opus`、`*.aac`、`*.m4a`、`*.ogg`；
+  - experiment trackers: `tensorboard/`、`wandb/`、`mlruns/`、`lightning_logs/`、`events.out.tfevents*`；
+  - result transfer bundles and archives: `download-bundles/`、`*.tar`、`*.tar.gz`、`*.tgz`、`*.zip`。
+- 这些规则不影响已跟踪的历史课程 demo wav；如未来确实要提交小型 curated media，需要显式 `git add -f`。
 
 ## 本会话决策
 
 - 训练机原始输出目录仍保留完整结果和 checkpoint；轻量下载包只是额外产物，不改变原始目录结构。
-- 默认分析只下载轻量包；除非要复现实验或继续训练，不默认下载 prior checkpoint、representation tensor 或整批 reconstruction wav。
-- 试听音频对默认 3 对，作为主观 sanity，不作为正式 benchmark 结论。
-- Pipeline 的 pack stage 可以被 `--skip-pack-results` 关闭，方便只跑原始实验输出。
+- 训练机完成实验后不应 commit 原始输出。用轻量结果包传回分析材料；后续如要固化结果，应在本地从 bundle 摘要整理成小型文档或表格后再提交。
 - macOS 的 `KMP_DUPLICATE_LIB_OK=TRUE` 仍只用于本地验证，不写入 Linux 训练命令。
 
 ## 仍损坏或未验证

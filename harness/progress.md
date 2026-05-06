@@ -235,3 +235,8 @@ Last reviewed: 2026-05-06
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，19 tests OK。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，38 tests OK。
+- 训练机开跑前确认 git hygiene：
+  - 训练后不应在训练机 commit 原始输出；结果传递优先使用 `download-bundles/<timestamp>/` 轻量目录。
+  - `.gitignore` 已覆盖默认训练输出 `/artifacts/`、context pipeline 输出 `evals/outputs/`、`/runs/`、`logs/`、`checkpoints/`、`outputs/` 和 `data/`。
+  - 当前没有 `artifacts/`、`evals/outputs/`、`outputs/`、`runs/`、`logs/`、`checkpoints/`、`data/` 下的已跟踪文件。
+  - 新增通用忽略规则，覆盖新生成的 checkpoint/model tensor、音频、TensorBoard/W&B/MLflow/lightning 日志、download bundles 和常见压缩包。

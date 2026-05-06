@@ -19,6 +19,30 @@ tmp/
 *.egg-info/
 
 logs/
+tensorboard/
+wandb/
+mlruns/
+lightning_logs/
+download-bundles/
+events.out.tfevents*
+
+# Training/eval artifacts. Existing archived demo audio remains tracked; new
+# generated media/checkpoints should be added intentionally with `git add -f`.
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.wav
+*.flac
+*.mp3
+*.opus
+*.aac
+*.m4a
+*.ogg
+*.tar
+*.tar.gz
+*.tgz
+*.zip
 
 evals/outputs/
 
