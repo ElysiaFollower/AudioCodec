@@ -1,4 +1,6 @@
 name: audiocodec
+# Cross-platform local development environment. On Linux CUDA training machines,
+# use environment-linux-cuda.yaml instead so PyTorch/CUDA/NCCL are pinned together.
 channels:
   - conda-forge
 dependencies:

@@ -30,6 +30,10 @@ cat <<'EOF'
 conda env update -f environment.yaml --prune
 conda activate audiocodec
 
+Linux A100 训练机环境：
+conda env create -f environment-linux-cuda.yaml
+conda activate audiocodec-cu121
+
 启动 / sanity：
 PYTHONPATH=src python scripts/train_codec.py --help
 

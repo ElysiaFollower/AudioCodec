@@ -27,9 +27,9 @@ Last reviewed: 2026-05-06
 
 ## 环境安装
 
-推荐直接使用仓库根目录下的 [environment.yaml](/Users/ely/workspace/research/audio/AudioCodec/environment.yaml)。
+macOS / CPU 本地开发使用 [environment.yaml](/Users/ely/workspace/research/audio/AudioCodec/environment.yaml)。Linux A100 训练机使用 [environment-linux-cuda.yaml](/Users/ely/workspace/research/audio/AudioCodec/environment-linux-cuda.yaml)，它固定 `pytorch=2.5.1`、`torchaudio=2.5.1` 和 `pytorch-cuda=12.1`，避免 pip 版 PyTorch 与系统 NCCL/CUDA 动态库混用。
 
-安装命令：
+macOS / CPU 安装命令：
 
 ```bash
 conda env create -f environment.yaml
@@ -43,9 +43,22 @@ conda env update -f environment.yaml --prune
 conda activate audiocodec
 ```
 
+Linux A100 建议新建干净环境：
+
+```bash
+conda env create -f environment-linux-cuda.yaml
+conda activate audiocodec-cu121
+```
+
+如果旧 `audiocodec` 环境已经出现 `libtorch_cuda.so` / NCCL symbol 错误，不建议在原环境上修补；直接使用新的 `audiocodec-cu121` 环境。
+
 ## 安装验证
 
 ```bash
+python - <<'PY'
+import torch, torchaudio
+print(torch.__version__, torch.version.cuda, torch.cuda.is_available())
+PY
 python scripts/train_codec.py --help
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```

@@ -1,0 +1,19 @@
+name: audiocodec-cu121
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip>=24
+  - ffmpeg
+  - matplotlib
+  - numpy
+  - setuptools>=68
+  - wheel
+  - pytorch=2.5.1
+  - torchaudio=2.5.1
+  - pytorch-cuda=12.1
+  - pip:
+      - tensorboard>=2.16,<3
+      - -e .

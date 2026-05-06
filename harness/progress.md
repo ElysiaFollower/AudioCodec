@@ -240,3 +240,16 @@ Last reviewed: 2026-05-06
   - `.gitignore` 已覆盖默认训练输出 `/artifacts/`、context pipeline 输出 `evals/outputs/`、`/runs/`、`logs/`、`checkpoints/`、`outputs/` 和 `data/`。
   - 当前没有 `artifacts/`、`evals/outputs/`、`outputs/`、`runs/`、`logs/`、`checkpoints/`、`data/` 下的已跟踪文件。
   - 新增通用忽略规则，覆盖新生成的 checkpoint/model tensor、音频、TensorBoard/W&B/MLflow/lightning 日志、download bundles 和常见压缩包。
+- 用户在训练机 dry-run 后正式运行遇到 `ImportError: libtorch_cuda.so: undefined symbol: ncclCommWindowDeregister`，定位为旧 `audiocodec` 环境中 pip torch 与 CUDA/NCCL 动态库不匹配。
+- 新增 `environment-linux-cuda.yaml` 作为 Linux A100 训练机专用环境：
+  - env name: `audiocodec-cu121`；
+  - conda channels: `pytorch / nvidia / conda-forge`；
+  - 固定 `pytorch=2.5.1`、`torchaudio=2.5.1`、`pytorch-cuda=12.1`；
+  - 保留 `pip install -e .` 和 `tensorboard>=2.16,<3`。
+- 保留 `environment.yaml` 作为 macOS / CPU 本地开发入口，并在文件注释中提示 Linux CUDA 训练机使用 `environment-linux-cuda.yaml`。
+- README、init、bootstrap contract、feature list 和 handoff 已同步训练机环境入口；旧环境出现 NCCL symbol mismatch 时不建议原地修补，直接创建 `audiocodec-cu121`。
+- 本轮环境文件验证：
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `python3` 解析 `environment.yaml` 和 `environment-linux-cuda.yaml` YAML 通过。

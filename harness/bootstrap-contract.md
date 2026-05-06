@@ -19,8 +19,9 @@ Last reviewed: 2026-05-06
 ## 环境
 
 - 技术栈：Python、PyTorch、torchaudio、SEANet-style encoder/decoder、EMA RVQ、traditional codec eval scripts
-- 运行时版本：`environment.yaml` 固定 `python=3.11`
-- 依赖安装：`conda env update -f environment.yaml --prune && conda activate audiocodec`
+- 运行时版本：`environment.yaml` 和 `environment-linux-cuda.yaml` 都固定 `python=3.11`
+- 本地依赖安装：`conda env update -f environment.yaml --prune && conda activate audiocodec`
+- Linux A100 训练依赖安装：`conda env create -f environment-linux-cuda.yaml && conda activate audiocodec-cu121`
 - 本地服务：无常驻本地服务；训练和评测通过命令行脚本运行
 - 数据边界：speech-only；默认数据集根路径来自 config 的 `dataset.root` 或训练命令的 `--dataset-root`
 
@@ -29,6 +30,9 @@ Last reviewed: 2026-05-06
 ```sh
 conda env update -f environment.yaml --prune
 conda activate audiocodec
+
+conda env create -f environment-linux-cuda.yaml
+conda activate audiocodec-cu121
 
 ./scripts/harness-check.sh
 git diff --check
@@ -51,6 +55,7 @@ PYTHONPATH=src python scripts/train_codec.py --config configs/ablation-adversari
 ## 已知缺口
 
 - 当前 macOS 开发机完整单测需要 `KMP_DUPLICATE_LIB_OK=TRUE` 绕过 OpenMP runtime 冲突；这不是 Linux A100 训练命令的一部分。
-- 尚未在本轮运行真实训练 smoke。
+- Linux A100 训练机必须使用 `environment-linux-cuda.yaml`；旧 `audiocodec` pip torch 环境曾出现 `libtorch_cuda.so` / NCCL symbol mismatch。
+- 尚未在新的 `audiocodec-cu121` Linux 环境运行真实训练 smoke。
 - Mamba/SSM 依赖尚未固定；只有 long-context diagnostics 通过 gate 后才评估是否引入 Mamba。
 - 研究收集、方向定义和 E0-E2 本地工具链已完成；当前 active item 是 `long-range-redundancy-diagnostics-and-context-route`，下一步是在训练机用真实 checkpoint/manifest 跑 pipeline，并下载轻量结果包分析。
