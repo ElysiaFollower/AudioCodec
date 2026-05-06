@@ -28,6 +28,7 @@ run_export=1
 run_diagnostics=1
 run_analytic_prior=1
 run_trained_priors=1
+run_collect_results=1
 dry_run=0
 
 usage() {
@@ -62,6 +63,7 @@ Stage switches:
   --skip-diagnostics
   --skip-analytic-prior
   --skip-trained-priors
+  --skip-collect-results
   --dry-run                        Print commands without running them.
 
 Environment:
@@ -186,6 +188,10 @@ while [ "$#" -gt 0 ]; do
       run_trained_priors=0
       shift
       ;;
+    --skip-collect-results)
+      run_collect_results=0
+      shift
+      ;;
     --dry-run)
       dry_run=1
       shift
@@ -280,6 +286,12 @@ long_transformer_cmd=(
   --eval-every "$train_eval_every"
   --device "$train_device"
 )
+collect_results_cmd=(
+  "$python_bin" "evals/scripts/collect_context_results.py"
+  --export-dir "$export_dir"
+  --output-dir "$output_root/results"
+  --prior-root "$output_root/priors"
+)
 if [ -n "$max_items" ]; then
   local_tcn_cmd+=(--max-train-items "$max_items" --max-eval-items "$max_items")
   long_transformer_cmd+=(--max-train-items "$max_items" --max-eval-items "$max_items")
@@ -297,4 +309,7 @@ fi
 if [ "$run_trained_priors" -eq 1 ]; then
   run_cmd "${local_tcn_cmd[@]}"
   run_cmd "${long_transformer_cmd[@]}"
+fi
+if [ "$run_collect_results" -eq 1 ]; then
+  run_cmd "${collect_results_cmd[@]}"
 fi

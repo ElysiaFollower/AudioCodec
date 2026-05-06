@@ -174,3 +174,22 @@ Last reviewed: 2026-05-06
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，15 tests OK。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，34 tests OK。
+- 结果聚合脚本实现完成：
+  - 新增 `evals/scripts/collect_context_results.py`，读取 diagnostics summary、analytic prior summary 和 trained prior summary；
+  - 输出 `results.jsonl`、`summary.csv` 和 `summary.json`；
+  - 统一字段覆盖 `stage`、`representation`、`prior_family`、`context_scope`、`bits_per_code`、`estimated_entropy_bitrate_kbps`、`entropy_savings_ratio`、`relative_improvement_vs_local_or_unigram` 和 `gate_passed`；
+  - `summary.json` 增加 `go_no_go`，同时要求 diagnostics gate 与 long prior gate 通过，才建议进入 codec context training；
+  - `scripts/run-context-prior-pipeline.sh` 已在最后自动调用结果聚合脚本。
+- 新增 synthetic summary 测试，覆盖结果表输出和 go/no-go 判定。
+- 本轮结果聚合验证：
+  - `./init.sh` 通过，并打印新的当前阶段提示。
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `python3 -m py_compile evals/scripts/collect_context_results.py` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/collect_context_results.py --help` 通过。
+  - `bash -n scripts/run-context-prior-pipeline.sh` 通过。
+  - `scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --export-dir /tmp/custom-export --max-items 1 --train-steps 1 --dry-run` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，16 tests OK。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，35 tests OK。

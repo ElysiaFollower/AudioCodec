@@ -31,6 +31,10 @@ from diagnose_representations import (
     _scope_specs,
     run_diagnostics,
 )
+from collect_context_results import (
+    CONTEXT_RESULTS_SCHEMA_VERSION,
+    collect_context_results,
+)
 from evaluate_code_priors import (
     CODE_PRIOR_SCHEMA_VERSION,
     TOKEN_ORDERING,
@@ -472,6 +476,8 @@ class ContextPriorPipelineTest(unittest.TestCase):
                 "/tmp/checkpoint.pt",
                 "--output-root",
                 "/tmp/context-pipeline",
+                "--export-dir",
+                "/tmp/custom-export",
                 "--max-items",
                 "1",
                 "--train-steps",
@@ -488,8 +494,146 @@ class ContextPriorPipelineTest(unittest.TestCase):
         self.assertIn("diagnose_representations.py", result.stdout)
         self.assertIn("evaluate_code_priors.py", result.stdout)
         self.assertIn("train_code_prior.py", result.stdout)
+        self.assertIn("collect_context_results.py", result.stdout)
         self.assertIn("local_tcn", result.stdout)
         self.assertIn("long_transformer", result.stdout)
+        self.assertIn("--prior-root /tmp/context-pipeline/priors", result.stdout)
+
+
+class ContextResultsCollectionTest(unittest.TestCase):
+    def test_collect_context_results_writes_table_and_gate_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            export_dir = root / "neural-4k-export"
+            diagnostics_dir = export_dir / "diagnostics"
+            analytic_dir = export_dir / "code_priors"
+            local_dir = root / "priors" / "local-tcn"
+            long_dir = root / "priors" / "long-transformer"
+            diagnostics_dir.mkdir(parents=True)
+            analytic_dir.mkdir(parents=True)
+            local_dir.mkdir(parents=True)
+            long_dir.mkdir(parents=True)
+
+            (diagnostics_dir / "summary.json").write_text(
+                """
+{
+  "schema_version": "representation-diagnostics-v1",
+  "aggregates": [
+    {"representation": "latent", "context_scope": "local", "items": 1, "metric": "predictability_score", "mean_value": 0.2},
+    {"representation": "latent", "context_scope": "long", "items": 1, "metric": "predictability_score", "mean_value": 0.24},
+    {"representation": "codes", "context_scope": "local", "items": 1, "metric": "window_reuse_rate", "mean_value": 0.3},
+    {"representation": "codes", "context_scope": "full_utterance", "items": 1, "metric": "window_reuse_rate", "mean_value": 0.4}
+  ],
+  "gate_recommendations": [
+    {"representation": "latent", "best_long_or_full_scope": "long", "passed": true},
+    {"representation": "codes", "best_long_or_full_scope": "full_utterance", "passed": true}
+  ]
+}
+""".strip()
+            )
+            (analytic_dir / "summary.json").write_text(
+                """
+{
+  "schema_version": "code-prior-entropy-v1",
+  "token_ordering": "time_major_frame_stage_coarse_to_fine",
+  "evaluation_split": "self_eval",
+  "priors": [
+    {
+      "prior_family": "unigram",
+      "prior_name": "unigram_per_stage",
+      "context_scope": "none",
+      "context_window_frames": 0,
+      "context_window_seconds": 0.0,
+      "bits_per_code": 2.0,
+      "stage_bits_per_code": [2.0, 2.0],
+      "estimated_entropy_bitrate_kbps": 4.0,
+      "nominal_bitrate_kbps": 4.0,
+      "entropy_savings_ratio": 0.0,
+      "relative_improvement_vs_unigram": 0.0
+    },
+    {
+      "prior_family": "previous_frame",
+      "prior_name": "previous_frame_markov_per_stage",
+      "context_scope": "local",
+      "context_window_frames": 1,
+      "context_window_seconds": 0.5,
+      "bits_per_code": 1.5,
+      "stage_bits_per_code": [1.5, 1.5],
+      "estimated_entropy_bitrate_kbps": 3.0,
+      "nominal_bitrate_kbps": 4.0,
+      "entropy_savings_ratio": 0.25,
+      "relative_improvement_vs_unigram": 0.25
+    }
+  ]
+}
+""".strip()
+            )
+            (local_dir / "summary.json").write_text(
+                """
+{
+  "schema_version": "code-prior-entropy-v1",
+  "prior_family": "local_tcn",
+  "prior_name": "local_tcn",
+  "token_ordering": "time_major_frame_stage_coarse_to_fine",
+  "context_scope": "local",
+  "context_window_frames": 5,
+  "context_window_seconds": 2.5,
+  "nominal_bitrate_kbps": 4.0,
+  "final_val": {
+    "dataset_split": "self_eval",
+    "bits_per_code": 1.4,
+    "stage_bits_per_code": [1.4, 1.4],
+    "estimated_entropy_bitrate_kbps": 2.8,
+    "nominal_bitrate_kbps": 4.0,
+    "entropy_savings_ratio": 0.3
+  }
+}
+""".strip()
+            )
+            (long_dir / "summary.json").write_text(
+                """
+{
+  "schema_version": "code-prior-entropy-v1",
+  "prior_family": "long_transformer",
+  "prior_name": "long_transformer",
+  "token_ordering": "time_major_frame_stage_coarse_to_fine",
+  "context_scope": "long",
+  "context_window_frames": 32,
+  "context_window_seconds": 16.0,
+  "nominal_bitrate_kbps": 4.0,
+  "final_val": {
+    "dataset_split": "self_eval",
+    "bits_per_code": 1.2,
+    "stage_bits_per_code": [1.2, 1.2],
+    "estimated_entropy_bitrate_kbps": 2.4,
+    "nominal_bitrate_kbps": 4.0,
+    "entropy_savings_ratio": 0.4
+  }
+}
+""".strip()
+            )
+
+            rows, summary = collect_context_results(
+                export_dir=export_dir,
+                output_dir=root / "results",
+                diagnostics_summary_path=diagnostics_dir / "summary.json",
+                analytic_prior_summary_path=analytic_dir / "summary.json",
+                trained_prior_summary_paths=[local_dir / "summary.json", long_dir / "summary.json"],
+                gate_threshold=0.05,
+            )
+
+            self.assertEqual(summary["schema_version"], CONTEXT_RESULTS_SCHEMA_VERSION)
+            self.assertTrue((root / "results" / "results.jsonl").exists())
+            self.assertTrue((root / "results" / "summary.csv").exists())
+            self.assertTrue((root / "results" / "summary.json").exists())
+            self.assertEqual(len(rows), 8)
+            self.assertTrue(summary["go_no_go"]["diagnostics_gate_passed"])
+            self.assertTrue(summary["go_no_go"]["prior_gate_passed"])
+            self.assertTrue(summary["go_no_go"]["go_to_codec_context_training"])
+            long_rows = [row for row in rows if row["prior_family"] == "long_transformer"]
+            self.assertEqual(len(long_rows), 1)
+            self.assertEqual(long_rows[0]["gate_reference"], "best_local:local_tcn")
+            self.assertTrue(long_rows[0]["gate_passed"])
 
 
 class EvalMetricsTest(unittest.TestCase):

@@ -81,6 +81,16 @@ PYTHONPATH=src python evals/scripts/train_code_prior.py \
 
 将 `--prior` 改为 `long_transformer` 可跑长窗 Transformer prior。该脚本写出 `train_metrics.jsonl`、`val_metrics.jsonl`、`summary.json`、`config.json` 和 `checkpoint.pt`；它只报告 entropy / token metrics，不报告 reconstruction fidelity。
 
+结果聚合脚本读取 pipeline 输出并生成统一结果表：
+
+```bash
+PYTHONPATH=src python evals/scripts/collect_context_results.py \
+  --export-dir evals/outputs/context-modeling/neural-4k-export \
+  --output-dir evals/outputs/context-modeling/results
+```
+
+该脚本输出 `results.jsonl`、`summary.csv` 和 `summary.json`，统一记录 `stage`、`representation`、`prior_family`、`context_scope`、`bits_per_code`、`estimated_entropy_bitrate_kbps`、`entropy_savings_ratio`、`relative_improvement_vs_local_or_unigram` 和 `gate_passed`。`summary.json` 中的 `go_no_go` 用于判断是否进入 codec context training。
+
 完整 pipeline 可用一个 bash 脚本串起 export、diagnostics、analytic prior 和 trained prior：
 
 ```bash
@@ -94,7 +104,7 @@ scripts/run-context-prior-pipeline.sh \
   --train-batch-size 8
 ```
 
-本机没有真实 checkpoint 时可先用 `--dry-run` 验证命令拼装。Linux 训练命令不要写入 macOS 的 `KMP_DUPLICATE_LIB_OK=TRUE` workaround。
+本机没有真实 checkpoint 时可先用 `--dry-run` 验证命令拼装。Pipeline 最后会自动调用结果聚合脚本。Linux 训练命令不要写入 macOS 的 `KMP_DUPLICATE_LIB_OK=TRUE` workaround。
 
 完整命令见：
 

@@ -114,6 +114,8 @@ Last reviewed: 2026-05-06
 - `tests/test_evals_scripts.py` 已覆盖 synthetic RVQ codes 的 `local_tcn` training metrics 和 `long_transformer` smoke。
 - `scripts/run-context-prior-pipeline.sh` 已串起 Phase 1 export、Phase 2 diagnostics、Phase 3 analytic prior 和 trained local/long prior。
 - Pipeline 支持 `--dry-run`，可在没有真实 checkpoint 时验证命令拼装。
+- `evals/scripts/collect_context_results.py` 已支持读取 pipeline 输出并生成 `results.jsonl`、`summary.csv` 和 `summary.json`。
+- 结果聚合会记录 `relative_improvement_vs_local_or_unigram`、`gate_passed` 和 `go_no_go`，用于判断是否进入 codec context training。
 
 实现任务：
 
@@ -188,4 +190,4 @@ macOS 上 `KMP_DUPLICATE_LIB_OK=TRUE` 只作为本地 OpenMP workaround，不进
 
 ## 下一步
 
-下一步优先用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 运行 `scripts/run-context-prior-pipeline.sh` 做真实 Phase 1 export + Phase 2 diagnostics + Phase 3 analytic/trained code-prior sanity。Mamba 依赖未固定前不进入主线。
+下一步优先用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 运行 `scripts/run-context-prior-pipeline.sh` 做真实 Phase 1 export + Phase 2 diagnostics + Phase 3 analytic/trained code-prior sanity，并查看 `results/summary.json` 的 `go_no_go`。Mamba 依赖未固定前不进入主线。
