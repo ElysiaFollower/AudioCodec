@@ -30,6 +30,11 @@ from diagnose_representations import (
     _scope_specs,
     run_diagnostics,
 )
+from evaluate_code_priors import (
+    CODE_PRIOR_SCHEMA_VERSION,
+    TOKEN_ORDERING,
+    run_code_prior_evaluation,
+)
 from export_neural_codec import (
     CONTEXT_EXPORT_SCHEMA_VERSION,
     _build_manifest_row,
@@ -286,6 +291,67 @@ class RepresentationDiagnosticsTest(unittest.TestCase):
             self.assertEqual(code_full["metric_family"], "code_window_reuse")
             self.assertIsNotNone(code_full["window_reuse_rate"])
             self.assertIsNotNone(code_full["marginal_entropy_bits_per_code"])
+
+
+class CodePriorEntropyTest(unittest.TestCase):
+    def test_run_code_prior_evaluation_writes_entropy_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            export_dir = root / "export"
+            reps_dir = export_dir / "representations"
+            reps_dir.mkdir(parents=True)
+
+            codes = torch.tensor([[[0, 0, 0, 1, 1, 1], [2, 2, 2, 3, 3, 3]]], dtype=torch.long)
+            codes_path = reps_dir / "utt.codes.pt"
+            torch.save(codes, codes_path)
+            manifest_path = export_dir / "manifest.jsonl"
+            write_jsonl(
+                manifest_path,
+                [
+                    {
+                        "id": "utt",
+                        "frame_rate": 2,
+                        "num_quantizers": 2,
+                        "codebook_size": 4,
+                        "bits_per_code": 2,
+                        "codes_path": str(codes_path),
+                    }
+                ],
+            )
+
+            rows, summary = run_code_prior_evaluation(
+                export_dir=export_dir,
+                manifest_path=manifest_path,
+                eval_export_dir=None,
+                eval_manifest_path=None,
+                output_dir=export_dir / "code_priors",
+                priors=["unigram", "previous_frame"],
+                codebook_size=None,
+                smoothing=1e-3,
+            )
+
+            self.assertEqual(len(rows), 4)
+            self.assertTrue((export_dir / "code_priors" / "train_metrics.jsonl").exists())
+            self.assertTrue((export_dir / "code_priors" / "val_metrics.jsonl").exists())
+            self.assertTrue((export_dir / "code_priors" / "summary.json").exists())
+            self.assertTrue((export_dir / "code_priors" / "config.json").exists())
+            self.assertEqual(summary["schema_version"], CODE_PRIOR_SCHEMA_VERSION)
+            self.assertEqual(summary["token_ordering"], TOKEN_ORDERING)
+            self.assertEqual(summary["evaluation_split"], "self_eval")
+            self.assertEqual(summary["num_quantizers"], 2)
+            self.assertEqual(len(summary["priors"]), 2)
+            unigram = [item for item in summary["priors"] if item["prior_family"] == "unigram"][0]
+            previous = [item for item in summary["priors"] if item["prior_family"] == "previous_frame"][0]
+            self.assertEqual(len(unigram["stage_bits_per_code"]), 2)
+            self.assertLessEqual(
+                previous["estimated_entropy_bitrate_kbps"],
+                unigram["estimated_entropy_bitrate_kbps"],
+            )
+            self.assertIn("entropy_savings_ratio", previous)
+            self.assertEqual(len(summary["blocked_priors"]), 3)
+            val_rows = read_jsonl(export_dir / "code_priors" / "val_metrics.jsonl")
+            self.assertEqual(val_rows[0]["schema_version"], CODE_PRIOR_SCHEMA_VERSION)
+            self.assertEqual(val_rows[0]["dataset_split"], "self_eval")
 
 
 class EvalMetricsTest(unittest.TestCase):

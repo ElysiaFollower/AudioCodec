@@ -119,3 +119,21 @@ Last reviewed: 2026-05-06
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，11 tests OK。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，30 tests OK。
+- Phase 3 analytic code-prior entropy baseline 工具实现完成：
+  - 新增 `evals/scripts/evaluate_code_priors.py`，只消费 Phase 1 export 的 frozen `codes.pt`，不改 codec reconstruction path；
+  - 当前实现 `unigram` 和 `previous_frame` 两个 analytic prior baseline；
+  - 输出 `code_priors/train_metrics.jsonl`、`code_priors/val_metrics.jsonl`、`code_priors/summary.json` 和 `code_priors/config.json`；
+  - summary 报告 `stage_bits_per_code`、`bits_per_code`、`estimated_entropy_bitrate_kbps`、`entropy_savings_ratio` 和 `relative_improvement_vs_unigram`；
+  - 统一记录 `time_major_frame_stage_coarse_to_fine` token ordering，并把 `local_tcn`、`long_transformer`、`mamba` 标为后续 blocked / not implemented。
+- 新增 synthetic RVQ codes 测试，覆盖 code-prior entropy summary、self-eval 输出、blocked priors 和 previous-frame 相对 unigram 的 bitrate 关系。
+- 本轮 Phase 3 验证：
+  - `./init.sh` 通过，并打印新的当前阶段提示。
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/evaluate_code_priors.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/diagnose_representations.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/export_neural_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，12 tests OK。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，31 tests OK。

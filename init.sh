@@ -8,7 +8,7 @@ repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$repo_root"
 
 echo "项目：AudioCodec speech neural codec research workspace"
-echo "当前阶段：Phase 1 export 与 Phase 2 diagnostics 工具已实现，下一步串真实 export+diagnostics sanity"
+echo "当前阶段：Phase 1 export、Phase 2 diagnostics、Phase 3 analytic code-prior 工具已实现，下一步串真实 sanity 或实现训练型 prior"
 echo "技术栈：Python 3.11, PyTorch, torchaudio, SEANet-style encoder/decoder, EMA RVQ, evals scripts"
 echo
 

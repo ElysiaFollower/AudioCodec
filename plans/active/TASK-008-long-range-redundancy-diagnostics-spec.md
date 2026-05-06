@@ -100,6 +100,15 @@ Last reviewed: 2026-05-06
 
 ## Phase 3 实现与实验规格
 
+当前实现状态：
+
+- `evals/scripts/evaluate_code_priors.py` 已支持读取 Phase 1 export 目录中的 frozen `codes.pt`。
+- 当前实现 analytic `unigram` 和 `previous_frame` baselines；不训练 codec、不改变 reconstruction path。
+- 输出 `train_metrics.jsonl`、`val_metrics.jsonl`、`summary.json` 和 `config.json`。
+- Summary 记录 `stage_bits_per_code`、`bits_per_code`、`estimated_entropy_bitrate_kbps`、`entropy_savings_ratio`、`relative_improvement_vs_unigram` 和 `time_major_frame_stage_coarse_to_fine` token ordering。
+- `local_tcn`、`long_transformer` 和 `mamba` 当前在 summary 中标记为 blocked / not implemented，不作为当前 analytic baseline 的伪结果。
+- `tests/test_evals_scripts.py` 已覆盖 synthetic RVQ codes 的 code-prior entropy summary。
+
 实现任务：
 
 - Code prior 只消费 frozen `codes.pt`，不改 reconstruction codec。
@@ -173,4 +182,4 @@ macOS 上 `KMP_DUPLICATE_LIB_OK=TRUE` 只作为本地 OpenMP workaround，不进
 
 ## 下一步
 
-下一步用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 串起 Phase 1 export + Phase 2 diagnostics sanity；不训练新模型，不引入 Mamba 依赖。等本地工具链积累到 Phase 3/4，再编写统一 bash 脚本程式化执行导出、诊断、prior 和训练。
+下一步优先用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 串起 Phase 1 export + Phase 2 diagnostics + Phase 3 analytic code-prior sanity；若真实数据仍不可用，继续实现 Phase 3 的 local TCN / long Transformer training prior。Mamba 依赖未固定前不进入主线。等本地工具链积累到 Phase 3/4，再编写统一 bash 脚本程式化执行导出、诊断、prior 和训练。

@@ -57,6 +57,16 @@ PYTHONPATH=src python evals/scripts/diagnose_representations.py \
 
 该脚本输出 `diagnostics/diagnostics.jsonl` 和 `diagnostics/summary.json`。连续表示使用 past-window mean prediction 的 `normalized_mse` / `predictability_score`，离散 codes 使用 `window_reuse_rate`、`previous_frame_match_rate` 和 `marginal_entropy_bits_per_code`。这些是 Phase 2 proxy diagnostics，不等于 Phase 3 learned code-prior entropy。
 
+Phase 3 code-prior entropy baseline 只消费 frozen RVQ codes，不改 reconstruction codec：
+
+```bash
+PYTHONPATH=src python evals/scripts/evaluate_code_priors.py \
+  --export-dir evals/outputs/context-modeling/neural-4k-export \
+  --priors unigram previous_frame
+```
+
+该脚本输出 `code_priors/train_metrics.jsonl`、`code_priors/val_metrics.jsonl`、`code_priors/summary.json` 和 `code_priors/config.json`。当前已实现 analytic `unigram` 和 `previous_frame` baselines，报告 `stage_bits_per_code`、`bits_per_code`、`estimated_entropy_bitrate_kbps` 和 `entropy_savings_ratio`，并记录 `time_major_frame_stage_coarse_to_fine` token ordering。`local_tcn`、`long_transformer` 和 `mamba` 仍是后续训练型 prior，不在当前脚本中伪造结果。
+
 完整命令见：
 
 - [run-traditional-codec-benchmark.md](/Users/ely/workspace/research/audio/AudioCodec/docs/archive/course-project/how-to/run-traditional-codec-benchmark.md)
