@@ -137,3 +137,24 @@ Last reviewed: 2026-05-06
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，12 tests OK。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，31 tests OK。
+- Phase 3 training code-prior baseline 工具实现完成：
+  - 新增 `evals/scripts/train_code_prior.py`，只消费 Phase 1 export 的 frozen `codes.pt`，不改 codec reconstruction path；
+  - 支持 `--prior local_tcn` 和 `--prior long_transformer`；
+  - 默认 token ordering 仍为 `time_major_frame_stage_coarse_to_fine`，target stage 按 flattened target token 归因；
+  - 输出 `train_metrics.jsonl`、`val_metrics.jsonl`、`summary.json`、`config.json` 和 `checkpoint.pt`；
+  - 指标与 analytic prior 对齐：`stage_bits_per_code`、`bits_per_code`、`estimated_entropy_bitrate_kbps`、`entropy_savings_ratio`；
+  - `evaluate_code_priors.py` 中关于 `local_tcn` / `long_transformer` 的 blocked 文案已改为使用训练脚本产生，避免误导。
+- 新增 synthetic RVQ codes 测试，覆盖 `local_tcn` training metrics 和 `long_transformer` smoke。
+- 本轮 training prior 验证：
+  - `./init.sh` 通过，并打印新的当前阶段提示。
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `python3 -m py_compile evals/scripts/train_code_prior.py` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/train_code_prior.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/evaluate_code_priors.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/diagnose_representations.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/export_neural_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，14 tests OK。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，33 tests OK。

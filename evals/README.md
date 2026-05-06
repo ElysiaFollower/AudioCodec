@@ -65,7 +65,21 @@ PYTHONPATH=src python evals/scripts/evaluate_code_priors.py \
   --priors unigram previous_frame
 ```
 
-该脚本输出 `code_priors/train_metrics.jsonl`、`code_priors/val_metrics.jsonl`、`code_priors/summary.json` 和 `code_priors/config.json`。当前已实现 analytic `unigram` 和 `previous_frame` baselines，报告 `stage_bits_per_code`、`bits_per_code`、`estimated_entropy_bitrate_kbps` 和 `entropy_savings_ratio`，并记录 `time_major_frame_stage_coarse_to_fine` token ordering。`local_tcn`、`long_transformer` 和 `mamba` 仍是后续训练型 prior，不在当前脚本中伪造结果。
+该脚本输出 `code_priors/train_metrics.jsonl`、`code_priors/val_metrics.jsonl`、`code_priors/summary.json` 和 `code_priors/config.json`。当前已实现 analytic `unigram` 和 `previous_frame` baselines，报告 `stage_bits_per_code`、`bits_per_code`、`estimated_entropy_bitrate_kbps` 和 `entropy_savings_ratio`，并记录 `time_major_frame_stage_coarse_to_fine` token ordering。`local_tcn` 和 `long_transformer` 由训练脚本负责，`mamba` 仍不进入主线。
+
+训练型 code prior 同样只消费 frozen RVQ codes：
+
+```bash
+PYTHONPATH=src python evals/scripts/train_code_prior.py \
+  --export-dir evals/outputs/context-modeling/neural-4k-export \
+  --prior local_tcn \
+  --output-dir evals/outputs/context-modeling/priors/local-tcn \
+  --steps 1000 \
+  --sequence-length 512 \
+  --batch-size 8
+```
+
+将 `--prior` 改为 `long_transformer` 可跑长窗 Transformer prior。该脚本写出 `train_metrics.jsonl`、`val_metrics.jsonl`、`summary.json`、`config.json` 和 `checkpoint.pt`；它只报告 entropy / token metrics，不报告 reconstruction fidelity。
 
 完整命令见：
 

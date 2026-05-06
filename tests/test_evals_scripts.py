@@ -44,6 +44,7 @@ from export_neural_codec import (
     _rvq_payload_bits,
     main as export_neural_codec_main,
 )
+from train_code_prior import train_code_prior
 from audiocodec.config import load_experiment_config
 from audiocodec.models.codec import build_codec_model
 
@@ -352,6 +353,108 @@ class CodePriorEntropyTest(unittest.TestCase):
             val_rows = read_jsonl(export_dir / "code_priors" / "val_metrics.jsonl")
             self.assertEqual(val_rows[0]["schema_version"], CODE_PRIOR_SCHEMA_VERSION)
             self.assertEqual(val_rows[0]["dataset_split"], "self_eval")
+
+
+class TrainCodePriorTest(unittest.TestCase):
+    def _write_codes_export(self, root: Path) -> tuple[Path, Path]:
+        export_dir = root / "export"
+        reps_dir = export_dir / "representations"
+        reps_dir.mkdir(parents=True)
+        codes = torch.tensor(
+            [
+                [[0, 0, 1, 1, 2, 2, 3, 3], [1, 1, 1, 2, 2, 2, 3, 3]],
+                [[3, 3, 2, 2, 1, 1, 0, 0], [2, 2, 2, 1, 1, 1, 0, 0]],
+            ],
+            dtype=torch.long,
+        )
+        codes_path = reps_dir / "utt.codes.pt"
+        torch.save(codes, codes_path)
+        manifest_path = export_dir / "manifest.jsonl"
+        write_jsonl(
+            manifest_path,
+            [
+                {
+                    "id": "utt",
+                    "frame_rate": 2,
+                    "num_quantizers": 2,
+                    "codebook_size": 4,
+                    "bits_per_code": 2,
+                    "codes_path": str(codes_path),
+                }
+            ],
+        )
+        return export_dir, manifest_path
+
+    def _args(self, prior: str) -> object:
+        return type(
+            "Args",
+            (),
+            {
+                "prior": prior,
+                "codebook_size": None,
+                "max_train_items": None,
+                "max_eval_items": None,
+                "steps": 2 if prior == "local_tcn" else 1,
+                "batch_size": 2,
+                "sequence_length": 6,
+                "eval_every": 1,
+                "learning_rate": 1e-3,
+                "weight_decay": 0.0,
+                "embedding_dim": 8,
+                "hidden_dim": 8,
+                "layers": 1,
+                "kernel_size": 3,
+                "transformer_heads": 2,
+                "dropout": 0.0,
+                "device": "cpu",
+                "seed": 13,
+            },
+        )()
+
+    def test_train_local_tcn_code_prior_writes_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            export_dir, manifest_path = self._write_codes_export(Path(tempdir))
+            output_dir = export_dir / "local_tcn_prior"
+
+            summary = train_code_prior(
+                args=self._args("local_tcn"),
+                export_dir=export_dir,
+                manifest_path=manifest_path,
+                eval_export_dir=None,
+                eval_manifest_path=None,
+                output_dir=output_dir,
+            )
+
+            self.assertEqual(summary["schema_version"], CODE_PRIOR_SCHEMA_VERSION)
+            self.assertEqual(summary["prior_family"], "local_tcn")
+            self.assertEqual(summary["context_scope"], "local")
+            self.assertEqual(summary["token_ordering"], TOKEN_ORDERING)
+            self.assertTrue((output_dir / "train_metrics.jsonl").exists())
+            self.assertTrue((output_dir / "val_metrics.jsonl").exists())
+            self.assertTrue((output_dir / "summary.json").exists())
+            self.assertTrue((output_dir / "config.json").exists())
+            self.assertTrue((output_dir / "checkpoint.pt").exists())
+            self.assertEqual(len(summary["final_val"]["stage_bits_per_code"]), 2)
+            self.assertIn("estimated_entropy_bitrate_kbps", summary["final_val"])
+
+    def test_train_long_transformer_code_prior_smoke(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            export_dir, manifest_path = self._write_codes_export(Path(tempdir))
+            output_dir = export_dir / "long_transformer_prior"
+
+            summary = train_code_prior(
+                args=self._args("long_transformer"),
+                export_dir=export_dir,
+                manifest_path=manifest_path,
+                eval_export_dir=None,
+                eval_manifest_path=None,
+                output_dir=output_dir,
+            )
+
+            self.assertEqual(summary["prior_family"], "long_transformer")
+            self.assertEqual(summary["context_scope"], "long")
+            self.assertTrue((output_dir / "checkpoint.pt").exists())
+            self.assertEqual(len(read_jsonl(output_dir / "val_metrics.jsonl")), 1)
 
 
 class EvalMetricsTest(unittest.TestCase):

@@ -77,13 +77,14 @@
       "priority": "P0",
       "area": "docs/plans/evals",
       "title": "长程时间冗余诊断与上下文建模实现路线",
-      "behavior": "围绕 docs/idea.md 的最新主题，用 active spec 定义 fixed-frame SEANet/RVQ baseline 上的 long-range redundancy diagnostics、code-prior entropy、latent/post-RVQ context training 和条件 dynamic frame-rate 分支；当前已实现 representation export、frozen representation diagnostics 和 analytic code-prior entropy 工具。",
+      "behavior": "围绕 docs/idea.md 的最新主题，用 active spec 定义 fixed-frame SEANet/RVQ baseline 上的 long-range redundancy diagnostics、code-prior entropy、latent/post-RVQ context training 和条件 dynamic frame-rate 分支；当前已实现 representation export、frozen representation diagnostics、analytic code-prior entropy 和 trained local TCN / long Transformer prior 工具。",
       "status": "active",
       "verification": [
         "./scripts/harness-check.sh",
         "git diff --check",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/diagnose_representations.py --help",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/evaluate_code_priors.py --help",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/train_code_prior.py --help",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v"
       ],
@@ -112,14 +113,18 @@
         "evals/scripts/evaluate_code_priors.py 已支持读取 frozen RVQ codes 并输出 train_metrics.jsonl / val_metrics.jsonl / summary.json / config.json",
         "tests/test_evals_scripts.py 覆盖 synthetic RVQ codes 的 unigram / previous_frame entropy summary",
         "evals/README.md 已记录 Phase 3 analytic code-prior 命令、指标和 blocked training prior 边界",
+        "evals/scripts/train_code_prior.py 已支持训练 local_tcn 与 long_transformer prior，输入仍为 frozen RVQ codes",
+        "tests/test_evals_scripts.py 覆盖 synthetic RVQ codes 的 local_tcn training metrics 与 long_transformer smoke",
+        "evals/README.md 已记录训练型 code-prior 命令和输出文件",
         "./scripts/harness-check.sh passed: 0 warnings",
         "git diff --check passed",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/diagnose_representations.py --help passed",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/evaluate_code_priors.py --help passed",
-        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v passed: 12 tests OK",
-        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 31 tests OK"
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/train_code_prior.py --help passed",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v passed: 14 tests OK",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 33 tests OK"
       ],
-      "notes": "当前唯一 active item。Phase 1 export、Phase 2 diagnostics 与 Phase 3 analytic code-prior 工具已实现；下一步用可访问的 long/full utterance manifest 和 4kbps checkpoint 串真实 export+diagnostics+prior sanity，或继续实现 Phase 3 local TCN / long Transformer training prior。"
+      "notes": "当前唯一 active item。Phase 1 export、Phase 2 diagnostics、Phase 3 analytic code-prior 与训练型 local TCN / long Transformer prior 工具已实现；下一步用可访问的 long/full utterance manifest 和 4kbps checkpoint 串真实 export+diagnostics+prior sanity，或编写统一 bash 脚本程式化执行这些步骤。"
     }
   ]
 }

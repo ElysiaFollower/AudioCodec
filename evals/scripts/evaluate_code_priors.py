@@ -472,11 +472,11 @@ def run_code_prior_evaluation(
         "blocked_priors": [
             {
                 "prior_family": "local_tcn",
-                "reason": "training prior not implemented in this Phase 3 analytic baseline commit",
+                "reason": "not produced by analytic evaluator; use train_code_prior.py for trained local TCN",
             },
             {
                 "prior_family": "long_transformer",
-                "reason": "training prior not implemented in this Phase 3 analytic baseline commit",
+                "reason": "not produced by analytic evaluator; use train_code_prior.py for trained long Transformer",
             },
             {
                 "prior_family": "mamba",
