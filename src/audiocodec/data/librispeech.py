@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import random
+import subprocess
 
 import torch
 from torch.utils.data import Dataset
@@ -20,13 +22,72 @@ def _load_torchaudio():
 def _get_audio_duration_seconds(path: Path) -> float:
     torchaudio = _load_torchaudio()
 
+    errors: list[Exception] = []
     info_fn = getattr(torchaudio, "info", None)
     if callable(info_fn):
-        info = info_fn(str(path))
-        return info.num_frames / info.sample_rate
+        try:
+            info = info_fn(str(path))
+            return info.num_frames / info.sample_rate
+        except Exception as exc:
+            errors.append(exc)
 
-    waveform, sample_rate = torchaudio.load(str(path))
-    return waveform.shape[-1] / sample_rate
+    try:
+        waveform, sample_rate = torchaudio.load(str(path))
+        return waveform.shape[-1] / sample_rate
+    except Exception as exc:
+        errors.append(exc)
+
+    try:
+        return _get_audio_duration_seconds_with_ffprobe(path)
+    except Exception as exc:
+        errors.append(exc)
+        messages = "; ".join(str(error) for error in errors)
+        raise RuntimeError(
+            f"Could not read audio duration for {path}; tried torchaudio and ffprobe. Errors: {messages}"
+        ) from exc
+
+
+def _get_audio_duration_seconds_with_ffprobe(path: Path) -> float:
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "json",
+        str(path),
+    ]
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+    payload = json.loads(result.stdout)
+    duration_seconds = float(payload["format"]["duration"])
+    if duration_seconds <= 0:
+        raise ValueError(f"ffprobe reported non-positive duration for {path}: {duration_seconds}")
+    return duration_seconds
+
+
+def _load_audio_with_ffmpeg(path: Path, sample_rate: int, channels: int) -> torch.Tensor:
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(path),
+        "-vn",
+        "-ac",
+        str(channels),
+        "-ar",
+        str(sample_rate),
+        "-f",
+        "f32le",
+        "-",
+    ]
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    waveform = torch.frombuffer(bytearray(result.stdout), dtype=torch.float32).clone()
+    if waveform.numel() % channels != 0:
+        raise ValueError(f"Decoded audio from {path} is not divisible by channel count {channels}.")
+    return waveform.view(-1, channels).transpose(0, 1).contiguous()
 
 
 def discover_librispeech_examples(
@@ -98,7 +159,11 @@ class SpeechSegmentDataset(Dataset):
     def _load_audio(self, path: Path) -> torch.Tensor:
         torchaudio = _load_torchaudio()
 
-        waveform, source_sample_rate = torchaudio.load(str(path))
+        try:
+            waveform, source_sample_rate = torchaudio.load(str(path))
+        except Exception:
+            return _load_audio_with_ffmpeg(path, sample_rate=self.sample_rate, channels=self.channels)
+
         if source_sample_rate != self.sample_rate:
             waveform = torchaudio.functional.resample(waveform, source_sample_rate, self.sample_rate)
 

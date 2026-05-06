@@ -169,6 +169,8 @@ Last reviewed: 2026-05-06
   - `./scripts/harness-check.sh` 通过，0 warnings。
   - `git diff --check` 通过。
   - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `python3` 解析 `environment-linux-cuda.yaml` 并确认 `ffmpeg`、`libsndfile`、`pysoundfile` 依赖存在。
+  - `conda search -c conda-forge pysoundfile --json` 和 `conda search -c conda-forge libsndfile --json` 能找到对应包。
   - `bash -n scripts/run-context-prior-pipeline.sh` 通过。
   - `scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --max-items 1 --train-steps 1 --dry-run` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
@@ -273,3 +275,22 @@ Last reviewed: 2026-05-06
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，20 tests OK。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，39 tests OK。
+- 用户在训练机运行 self-contained pipeline 时，`evals/scripts/build_manifest.py` 构建 manifest 失败：`torchaudio.info()` 在 `audiocodec-cu121` 环境中找不到处理 `.flac` 的 backend。
+- 判断：这本质上是新的 Linux CUDA conda 环境缺少可用 FLAC audio backend，而不是数据不可用；历史训练可行只说明当时环境或代码路径具备可用解码能力。当前分支的 self-contained pipeline 先执行 manifest 构建，所以更早暴露了同一类 `.flac` backend 问题。
+- 已同步补强 `environment-linux-cuda.yaml`：
+  - 保留 `ffmpeg`；
+  - 新增 `libsndfile` 和 `pysoundfile`，用于让 torchaudio soundfile backend 处理 LibriSpeech `.flac`；
+  - README 的安装验证增加 `torchaudio.list_audio_backends()` 输出。
+- 已修复 LibriSpeech 数据加载的 FLAC backend fallback：
+  - `src/audiocodec/data/librispeech.py` 的 duration discovery 在 `torchaudio.info/load` 失败后使用 `ffprobe` 读取时长；
+  - `SpeechSegmentDataset` 在 `torchaudio.load` 失败后使用 `ffmpeg` 解码到 float32 waveform；
+  - 这同时覆盖 manifest 构建和后续 codec 训练读取 FLAC 两条路径。
+- 新增 `tests/test_librispeech.py`，模拟 torchaudio backend 缺失并覆盖 `ffprobe` duration fallback 与 `ffmpeg` dataset load fallback。
+- 本轮 FLAC fallback 验证：
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `bash -n scripts/run-context-prior-pipeline.sh` 通过。
+  - `python -m py_compile src/audiocodec/data/librispeech.py tests/test_librispeech.py` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_librispeech -v` 通过，2 tests OK。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，41 tests OK。

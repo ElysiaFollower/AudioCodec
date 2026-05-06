@@ -43,7 +43,7 @@ conda env update -f environment.yaml --prune
 conda activate audiocodec
 ```
 
-Linux A100 建议新建干净环境：
+Linux A100 建议新建干净环境。该环境固定 CUDA PyTorch 依赖，并显式安装 `ffmpeg`、`libsndfile` 和 `pysoundfile`，用于 LibriSpeech `.flac` 的解码与时长探测：
 
 ```bash
 conda env create -f environment-linux-cuda.yaml
@@ -58,6 +58,7 @@ conda activate audiocodec-cu121
 python - <<'PY'
 import torch, torchaudio
 print(torch.__version__, torch.version.cuda, torch.cuda.is_available())
+print(torchaudio.list_audio_backends())
 PY
 python scripts/train_codec.py --help
 PYTHONPATH=src python -m unittest discover -s tests -v

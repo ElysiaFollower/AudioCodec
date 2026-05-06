@@ -7,8 +7,10 @@ dependencies:
   - python=3.11
   - pip>=24
   - ffmpeg
+  - libsndfile
   - matplotlib
   - numpy
+  - pysoundfile
   - setuptools>=68
   - wheel
   - pytorch=2.5.1

@@ -132,12 +132,17 @@
         "scripts/run-context-prior-pipeline.sh 已改为 self-contained 默认入口：不传 manifest/checkpoint 时先构建 manifest、训练当前分支自己的 4kbps baseline，再运行 export/diagnostics/priors/pack",
         "evals/scripts/build_manifest.py 支持 --dataset-root，使一键 pipeline 可以在训练机用实际数据路径覆盖 config 中的默认路径",
         "harness/decisions.md 记录 context pipeline 必须自包含产出 baseline 资产，--checkpoint/--manifest 只作为显式复现或调试入口",
+        "src/audiocodec/data/librispeech.py 已为 torchaudio FLAC backend 缺失场景增加 ffprobe duration fallback 和 ffmpeg waveform decode fallback",
+        "tests/test_librispeech.py 覆盖 torchaudio 无法处理 FLAC 时的 duration fallback 与 dataset load fallback",
+        "environment-linux-cuda.yaml 已显式加入 libsndfile 与 pysoundfile，用于让 torchaudio soundfile backend 处理 LibriSpeech .flac；ffmpeg/ffprobe fallback 保留为运行时保险",
         "environment-linux-cuda.yaml 已新增 Linux A100 专用 conda 环境，固定 pytorch=2.5.1、torchaudio=2.5.1 和 pytorch-cuda=12.1，避免 pip torch 与 NCCL/CUDA 动态库混用",
         "README.md、init.sh、harness/bootstrap-contract.md 和 session handoff 已指向 audiocodec-cu121 作为训练机环境",
         "./scripts/harness-check.sh passed: 0 warnings",
         "git diff --check passed",
         "python3 -m json.tool harness/feature_list.json >/dev/null passed",
         "python3 YAML parse for environment.yaml and environment-linux-cuda.yaml passed",
+        "python3 YAML parse confirmed environment-linux-cuda.yaml includes ffmpeg, libsndfile, and pysoundfile",
+        "conda search -c conda-forge pysoundfile --json and conda search -c conda-forge libsndfile --json found both packages",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/diagnose_representations.py --help passed",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/evaluate_code_priors.py --help passed",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python evals/scripts/train_code_prior.py --help passed",
@@ -148,7 +153,8 @@
         "scripts/run-context-prior-pipeline.sh --dry-run passed",
         "scripts/pack-context-results.sh --dry-run passed",
         "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v passed: 20 tests OK",
-        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 39 tests OK"
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_librispeech -v passed: 2 tests OK",
+        "conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v passed: 41 tests OK"
       ],
       "notes": "当前唯一 active item。Phase 1 export、Phase 2 diagnostics、Phase 3 analytic/trained code-prior、统一 pipeline、结果聚合与轻量结果包已实现；pipeline 默认自包含构建 manifest 并训练当前分支自己的 4kbps baseline。下一步在训练机用 dataset-root 和 CUDA device 跑真实 self-contained sanity，查看 results/summary.json 的 go_no_go，并下载轻量结果包。"
     }
