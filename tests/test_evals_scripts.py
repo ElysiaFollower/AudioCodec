@@ -4,6 +4,7 @@ import tempfile
 from contextlib import redirect_stdout
 import io
 from pathlib import Path
+import subprocess
 import sys
 import unittest
 from unittest import mock
@@ -455,6 +456,40 @@ class TrainCodePriorTest(unittest.TestCase):
             self.assertEqual(summary["context_scope"], "long")
             self.assertTrue((output_dir / "checkpoint.pt").exists())
             self.assertEqual(len(read_jsonl(output_dir / "val_metrics.jsonl")), 1)
+
+
+class ContextPriorPipelineTest(unittest.TestCase):
+    def test_pipeline_dry_run_prints_all_stages(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = root / "scripts" / "run-context-prior-pipeline.sh"
+        result = subprocess.run(
+            [
+                "bash",
+                str(script),
+                "--manifest",
+                "evals/data/manifests/test.jsonl",
+                "--checkpoint",
+                "/tmp/checkpoint.pt",
+                "--output-root",
+                "/tmp/context-pipeline",
+                "--max-items",
+                "1",
+                "--train-steps",
+                "1",
+                "--dry-run",
+            ],
+            cwd=root,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertIn("export_neural_codec.py", result.stdout)
+        self.assertIn("diagnose_representations.py", result.stdout)
+        self.assertIn("evaluate_code_priors.py", result.stdout)
+        self.assertIn("train_code_prior.py", result.stdout)
+        self.assertIn("local_tcn", result.stdout)
+        self.assertIn("long_transformer", result.stdout)
 
 
 class EvalMetricsTest(unittest.TestCase):

@@ -112,6 +112,8 @@ Last reviewed: 2026-05-06
 - 训练脚本输出 `train_metrics.jsonl`、`val_metrics.jsonl`、`summary.json`、`config.json` 和 `checkpoint.pt`，指标口径与 analytic prior 对齐。
 - `mamba` 仍未进入主线；当前脚本不引入 SSM 依赖。
 - `tests/test_evals_scripts.py` 已覆盖 synthetic RVQ codes 的 `local_tcn` training metrics 和 `long_transformer` smoke。
+- `scripts/run-context-prior-pipeline.sh` 已串起 Phase 1 export、Phase 2 diagnostics、Phase 3 analytic prior 和 trained local/long prior。
+- Pipeline 支持 `--dry-run`，可在没有真实 checkpoint 时验证命令拼装。
 
 实现任务：
 
@@ -186,4 +188,4 @@ macOS 上 `KMP_DUPLICATE_LIB_OK=TRUE` 只作为本地 OpenMP workaround，不进
 
 ## 下一步
 
-下一步优先用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 串起 Phase 1 export + Phase 2 diagnostics + Phase 3 analytic/trained code-prior sanity；若真实数据仍不可用，编写统一 bash 脚本程式化执行导出、诊断、analytic prior 和 trained prior。Mamba 依赖未固定前不进入主线。
+下一步优先用已有 4kbps checkpoint 和可访问的 long/full utterance manifest 运行 `scripts/run-context-prior-pipeline.sh` 做真实 Phase 1 export + Phase 2 diagnostics + Phase 3 analytic/trained code-prior sanity。Mamba 依赖未固定前不进入主线。

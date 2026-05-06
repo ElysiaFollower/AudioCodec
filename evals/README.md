@@ -81,6 +81,21 @@ PYTHONPATH=src python evals/scripts/train_code_prior.py \
 
 将 `--prior` 改为 `long_transformer` 可跑长窗 Transformer prior。该脚本写出 `train_metrics.jsonl`、`val_metrics.jsonl`、`summary.json`、`config.json` 和 `checkpoint.pt`；它只报告 entropy / token metrics，不报告 reconstruction fidelity。
 
+完整 pipeline 可用一个 bash 脚本串起 export、diagnostics、analytic prior 和 trained prior：
+
+```bash
+scripts/run-context-prior-pipeline.sh \
+  --manifest evals/data/manifests/test.jsonl \
+  --checkpoint /path/to/checkpoint.pt \
+  --output-root evals/outputs/context-modeling \
+  --codec-label neural-4k \
+  --train-steps 1000 \
+  --train-sequence-length 512 \
+  --train-batch-size 8
+```
+
+本机没有真实 checkpoint 时可先用 `--dry-run` 验证命令拼装。Linux 训练命令不要写入 macOS 的 `KMP_DUPLICATE_LIB_OK=TRUE` workaround。
+
 完整命令见：
 
 - [run-traditional-codec-benchmark.md](/Users/ely/workspace/research/audio/AudioCodec/docs/archive/course-project/how-to/run-traditional-codec-benchmark.md)

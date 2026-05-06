@@ -158,3 +158,19 @@ Last reviewed: 2026-05-06
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，14 tests OK。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，33 tests OK。
+- Pipeline 脚本实现完成：
+  - 新增 `scripts/run-context-prior-pipeline.sh`，串起 `export_neural_codec.py --save-representations`、`diagnose_representations.py`、`evaluate_code_priors.py`、`train_code_prior.py --prior local_tcn` 和 `train_code_prior.py --prior long_transformer`；
+  - 支持 `--dry-run`，用于没有真实 checkpoint 时验证命令拼装；
+  - 支持 `--max-items`、`--train-steps`、`--train-batch-size`、`--train-sequence-length`、`--train-device` 等实验参数；
+  - 不在脚本中写入 macOS `KMP_DUPLICATE_LIB_OK=TRUE` workaround，避免污染 Linux 训练命令。
+- 新增 pipeline dry-run 测试，覆盖 export、diagnostics、analytic prior、local TCN prior 和 long Transformer prior 五段命令。
+- 本轮 pipeline 验证：
+  - `./init.sh` 通过，并打印新的当前阶段提示。
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `bash -n scripts/run-context-prior-pipeline.sh` 通过。
+  - `scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --max-items 1 --train-steps 1 --dry-run` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，15 tests OK。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，34 tests OK。
