@@ -88,4 +88,4 @@ python scripts/train_codec.py --dataset-root /path/to/LibriSpeech/dev-clean --sm
 - `scripts/run-context-prior-pipeline.sh`
   串起长程冗余诊断流水线，并在末尾默认调用轻量打包脚本。
 - `scripts/pack-context-results.sh`
-  从 pipeline 输出中白名单复制 `summary / metrics / manifest / run metadata`，生成可下载的小目录；不会复制 `checkpoint.pt`、representation tensor 或 reconstruction wav。
+  从 pipeline 输出中白名单复制 `summary / metrics / manifest / run metadata` 和少量试听音频对，生成可下载的小目录；不会复制 `checkpoint.pt`、representation tensor 或整批 reconstruction wav。

@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 from contextlib import redirect_stdout
 import io
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -484,6 +485,8 @@ class ContextPriorPipelineTest(unittest.TestCase):
                 "1",
                 "--bundle-dir",
                 "/tmp/context-bundle",
+                "--audio-pairs",
+                "1",
                 "--dry-run",
             ],
             cwd=root,
@@ -502,6 +505,7 @@ class ContextPriorPipelineTest(unittest.TestCase):
         self.assertIn("long_transformer", result.stdout)
         self.assertIn("--prior-root /tmp/context-pipeline/priors", result.stdout)
         self.assertIn("--bundle-dir /tmp/context-bundle", result.stdout)
+        self.assertIn("--audio-pairs 1", result.stdout)
 
 
 class ContextResultsBundleTest(unittest.TestCase):
@@ -513,7 +517,9 @@ class ContextResultsBundleTest(unittest.TestCase):
         diagnostics_dir = export_dir / "diagnostics"
         local_dir = prior_root / "local-tcn"
         long_dir = prior_root / "long-transformer"
+        sources_dir = output_root / "sources"
         heavy_dirs = [
+            sources_dir,
             export_dir / "representations",
             export_dir / "reconstructions",
             local_dir,
@@ -525,7 +531,20 @@ class ContextResultsBundleTest(unittest.TestCase):
         for directory in heavy_dirs:
             directory.mkdir(parents=True, exist_ok=True)
 
-        (export_dir / "manifest.jsonl").write_text('{"id": "utt"}\n')
+        source_path = sources_dir / "utt.wav"
+        reconstruction_path = export_dir / "reconstructions" / "utt.wav"
+        source_path.write_text("source audio\n")
+        reconstruction_path.write_text("reconstruction audio\n")
+        (export_dir / "manifest.jsonl").write_text(
+            json.dumps(
+                {
+                    "id": "utt",
+                    "source_path": str(source_path),
+                    "reconstruction_path": str(reconstruction_path),
+                }
+            )
+            + "\n"
+        )
         (export_dir / "run.json").write_text("{}\n")
         (diagnostics_dir / "summary.json").write_text("{}\n")
         (diagnostics_dir / "diagnostics.jsonl").write_text('{"stage": "diagnostics"}\n')
@@ -539,7 +558,6 @@ class ContextResultsBundleTest(unittest.TestCase):
         (results_dir / "summary.json").write_text("{}\n")
 
         (export_dir / "representations" / "utt.codes.pt").write_text("heavy tensor\n")
-        (export_dir / "reconstructions" / "utt.wav").write_text("heavy wav\n")
         (local_dir / "checkpoint.pt").write_text("heavy checkpoint\n")
         (long_dir / "checkpoint.pt").write_text("heavy checkpoint\n")
         return export_dir, results_dir, prior_root
@@ -582,6 +600,8 @@ class ContextResultsBundleTest(unittest.TestCase):
             self.assertTrue((bundle_dir / "results" / "summary.csv").exists())
             self.assertTrue((bundle_dir / "priors" / "local-tcn" / "summary.json").exists())
             self.assertTrue((bundle_dir / "priors" / "long-transformer" / "val_metrics.jsonl").exists())
+            self.assertTrue((bundle_dir / "audio_pairs" / "001-utt" / "source.wav").exists())
+            self.assertTrue((bundle_dir / "audio_pairs" / "001-utt" / "reconstruction.wav").exists())
             self.assertFalse((bundle_dir / "neural-4k-export" / "representations" / "utt.codes.pt").exists())
             self.assertFalse((bundle_dir / "neural-4k-export" / "reconstructions" / "utt.wav").exists())
             self.assertFalse((bundle_dir / "priors" / "local-tcn" / "checkpoint.pt").exists())
@@ -619,6 +639,39 @@ class ContextResultsBundleTest(unittest.TestCase):
 
             self.assertIn("[dry-run] copy", result.stdout)
             self.assertFalse(bundle_dir.exists())
+
+    def test_pack_context_results_can_skip_audio_pairs(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = root / "scripts" / "pack-context-results.sh"
+        with tempfile.TemporaryDirectory() as tempdir:
+            temp_root = Path(tempdir)
+            output_root = temp_root / "context"
+            export_dir, results_dir, prior_root = self._write_context_outputs(output_root)
+            bundle_dir = temp_root / "bundle"
+
+            subprocess.run(
+                [
+                    "bash",
+                    str(script),
+                    "--output-root",
+                    str(output_root),
+                    "--export-dir",
+                    str(export_dir),
+                    "--results-dir",
+                    str(results_dir),
+                    "--prior-root",
+                    str(prior_root),
+                    "--bundle-dir",
+                    str(bundle_dir),
+                    "--skip-audio-pairs",
+                ],
+                cwd=root,
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertFalse((bundle_dir / "audio_pairs").exists())
 
 
 class ContextResultsCollectionTest(unittest.TestCase):

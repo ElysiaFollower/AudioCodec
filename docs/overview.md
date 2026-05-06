@@ -63,8 +63,8 @@ waveform -> SEANet encoder -> downsampled latent -> EMA RVQ -> RVQ codes -> quan
 当前 idea 和 E0-E2 go/no-go 工具链已基本成形。下一步是把仓库 clone 到 Linux 训练机，用真实 checkpoint 和 long/full utterance manifest 跑一键 pipeline：
 
 - `scripts/run-context-prior-pipeline.sh` 串起 representation export、frozen diagnostics、analytic prior、trained local/long prior、结果聚合和轻量结果包；
-- `scripts/pack-context-results.sh` 会生成只包含分析所需 `summary / metrics / manifest / run metadata` 的可下载目录；
-- 训练 checkpoint、representation tensor 和 reconstruction wav 默认保留在原始输出目录，不进入轻量下载包；
+- `scripts/pack-context-results.sh` 会生成包含分析所需 `summary / metrics / manifest / run metadata` 和少量 `source / reconstruction` 试听对的可下载目录；
+- 训练 checkpoint、representation tensor 和整批 reconstruction wav 默认保留在原始输出目录，不进入轻量下载包；
 - 先看 `results/summary.json` 的 `go_no_go`，再决定是否进入 Phase 4 codec context training。
 
 实现应服务于这个对照，而不是提前预设某个层级或某个模型族一定获胜。

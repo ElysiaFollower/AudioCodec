@@ -215,3 +215,23 @@ Last reviewed: 2026-05-06
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，18 tests OK。
   - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，37 tests OK。
+- 用户补充：轻量结果包应保留个别原始和重建音频对，方便训练后通过试听获得直观体验。
+- 已将试听对纳入轻量结果包：
+  - `scripts/pack-context-results.sh` 默认从 `manifest.jsonl` 解析并复制前 3 对 `source_path / reconstruction_path` 到 `audio_pairs/`；
+  - 支持 `--audio-pairs N` 调整数量，`--skip-audio-pairs` 关闭；
+  - `scripts/run-context-prior-pipeline.sh` 支持把 `--audio-pairs` 和 `--skip-audio-pairs` 透传给 pack stage；
+  - 下载包仍不复制 trained prior checkpoint、representation tensor 或整批 reconstruction wav。
+- 新增测试覆盖：
+  - 轻量结果包会包含 `audio_pairs/001-utt/source.wav` 和 `reconstruction.wav`；
+  - `--skip-audio-pairs` 不创建 `audio_pairs/`；
+  - pipeline dry-run 能透传 `--audio-pairs`。
+- 本轮试听对补充验证：
+  - `./scripts/harness-check.sh` 通过，0 warnings。
+  - `git diff --check` 通过。
+  - `python3 -m json.tool harness/feature_list.json >/dev/null` 通过。
+  - `bash -n scripts/pack-context-results.sh` 通过。
+  - `bash -n scripts/run-context-prior-pipeline.sh` 通过。
+  - `scripts/run-context-prior-pipeline.sh --manifest evals/data/manifests/test.jsonl --checkpoint /tmp/checkpoint.pt --output-root /tmp/context-pipeline --export-dir /tmp/custom-export --max-items 1 --train-steps 1 --bundle-dir /tmp/context-bundle --audio-pairs 1 --dry-run` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python scripts/train_codec.py --help` 通过。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest tests.test_evals_scripts -v` 通过，19 tests OK。
+  - `conda run -n audiocodec env PYTHONPATH=src KMP_DUPLICATE_LIB_OK=TRUE python -m unittest discover -s tests -v` 通过，38 tests OK。

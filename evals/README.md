@@ -114,7 +114,7 @@ scripts/pack-context-results.sh \
   --export-dir evals/outputs/context-modeling/neural-4k-export
 ```
 
-默认输出到 `evals/outputs/context-modeling/download-bundles/<timestamp>/`。这个目录只白名单复制 `manifest.jsonl`、`run.json`、diagnostics/code-prior/results 的 `summary.json`、`summary.csv`、`results.jsonl`、`train_metrics.jsonl`、`val_metrics.jsonl` 和 `config.json`，并写入 `BUNDLE_MANIFEST.txt`。它不会复制 `checkpoint.pt`、`*.pt` representation tensor、reconstruction wav 或压缩音频。若训练机下载路径需要固定，可在 pipeline 中使用 `--bundle-dir /path/to/download-bundle`；若只想保留原始输出，可用 `--skip-pack-results`。
+默认输出到 `evals/outputs/context-modeling/download-bundles/<timestamp>/`。这个目录只白名单复制 `manifest.jsonl`、`run.json`、diagnostics/code-prior/results 的 `summary.json`、`summary.csv`、`results.jsonl`、`train_metrics.jsonl`、`val_metrics.jsonl` 和 `config.json`，并写入 `BUNDLE_MANIFEST.txt`。为保留直观试听入口，它还会默认复制前 3 对 `source / reconstruction` 音频到 `audio_pairs/`，可用 `--audio-pairs N` 调整或 `--skip-audio-pairs` 关闭。它不会复制 `checkpoint.pt`、`*.pt` representation tensor、整批 reconstruction wav 或压缩音频。若训练机下载路径需要固定，可在 pipeline 中使用 `--bundle-dir /path/to/download-bundle`；若只想保留原始输出，可用 `--skip-pack-results`。
 
 完整命令见：
 

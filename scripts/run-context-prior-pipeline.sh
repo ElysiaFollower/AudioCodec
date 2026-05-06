@@ -33,6 +33,7 @@ run_pack_results=1
 bundle_root=""
 bundle_dir=""
 bundle_run_id=""
+audio_pairs=""
 dry_run=0
 
 usage() {
@@ -66,6 +67,7 @@ Result bundle options:
   --bundle-root DIR                Bundle root, default: output-root/download-bundles.
   --bundle-dir DIR                 Exact bundle dir for lightweight downloadable results.
   --bundle-run-id ID               Bundle subdir name when --bundle-dir is not set.
+  --audio-pairs N                  Copy up to N source/reconstruction pairs into bundle, default: 3.
 
 Stage switches:
   --skip-export
@@ -74,6 +76,7 @@ Stage switches:
   --skip-trained-priors
   --skip-collect-results
   --skip-pack-results
+  --skip-audio-pairs
   --dry-run                        Print commands without running them.
 
 Environment:
@@ -197,6 +200,11 @@ while [ "$#" -gt 0 ]; do
       bundle_run_id=$2
       shift 2
       ;;
+    --audio-pairs)
+      require_value "$1" "${2:-}"
+      audio_pairs=$2
+      shift 2
+      ;;
     --skip-export)
       run_export=0
       shift
@@ -219,6 +227,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-pack-results)
       run_pack_results=0
+      shift
+      ;;
+    --skip-audio-pairs)
+      audio_pairs=0
       shift
       ;;
     --dry-run)
@@ -336,6 +348,9 @@ if [ -n "$bundle_dir" ]; then
 fi
 if [ -n "$bundle_run_id" ]; then
   pack_results_cmd+=(--run-id "$bundle_run_id")
+fi
+if [ -n "$audio_pairs" ]; then
+  pack_results_cmd+=(--audio-pairs "$audio_pairs")
 fi
 if [ -n "$max_items" ]; then
   local_tcn_cmd+=(--max-train-items "$max_items" --max-eval-items "$max_items")

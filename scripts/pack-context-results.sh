@@ -7,12 +7,14 @@ repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repo_root"
 
 output_root="evals/outputs/context-modeling"
+python_bin=${PYTHON_BIN:-python}
 export_dir=""
 results_dir=""
 prior_root=""
 bundle_root=""
 bundle_dir=""
 run_id=""
+audio_pairs=3
 dry_run=0
 
 usage() {
@@ -28,10 +30,12 @@ Common options:
   --bundle-root DIR                Bundle root, default: output-root/download-bundles.
   --bundle-dir DIR                 Exact bundle dir. Overrides --bundle-root and --run-id.
   --run-id ID                      Bundle subdir name when --bundle-dir is not set.
+  --audio-pairs N                  Copy up to N source/reconstruction pairs, default: 3.
+  --skip-audio-pairs               Equivalent to --audio-pairs 0.
   --dry-run                        Print planned copies without creating files.
 
 The bundle uses a whitelist and intentionally excludes checkpoints, representation
-tensors, reconstructions, compressed audio, and other heavy artifacts.
+tensors, bulk reconstructions, compressed audio, and other heavy artifacts.
 EOF
 }
 
@@ -79,6 +83,15 @@ while [ "$#" -gt 0 ]; do
       run_id=$2
       shift 2
       ;;
+    --audio-pairs)
+      require_value "$1" "${2:-}"
+      audio_pairs=$2
+      shift 2
+      ;;
+    --skip-audio-pairs)
+      audio_pairs=0
+      shift
+      ;;
     --dry-run)
       dry_run=1
       shift
@@ -94,6 +107,13 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+case "$audio_pairs" in
+  ""|*[!0-9]*)
+    printf 'Error: --audio-pairs must be a non-negative integer.\n' >&2
+    exit 2
+    ;;
+esac
 
 if [ -z "$export_dir" ]; then
   export_dir="$output_root/neural-4k-export"
@@ -135,7 +155,8 @@ init_manifest() {
     printf 'export_dir: %s\n' "$export_dir"
     printf 'results_dir: %s\n' "$results_dir"
     printf 'prior_root: %s\n' "$prior_root"
-    printf 'excludes: checkpoint.pt, *.pt tensors, wav/audio reconstructions, compressed codec outputs\n'
+    printf 'audio_pairs: %s\n' "$audio_pairs"
+    printf 'excludes: checkpoint.pt, *.pt tensors, bulk reconstructions, compressed codec outputs\n'
     printf '\n[copied]\n'
   } > "$manifest_file"
 }
@@ -172,6 +193,90 @@ copy_prior_files() {
   copy_if_exists "$prior_dir/val_metrics.jsonl" "$prior_dest/val_metrics.jsonl"
 }
 
+copy_audio_pairs() {
+  if [ "$audio_pairs" -eq 0 ]; then
+    return
+  fi
+  manifest_path="$export_dir/manifest.jsonl"
+  if [ ! -f "$manifest_path" ]; then
+    if [ "$dry_run" -eq 1 ]; then
+      printf '[dry-run] audio pairs skipped; missing %s\n' "$manifest_path"
+    else
+      printf 'audio pairs skipped; missing %s\n' "$manifest_path" >> "$bundle_dir/.missing.tmp"
+    fi
+    missing=$((missing + 1))
+    return
+  fi
+
+  audio_plan=$(mktemp "${TMPDIR:-/tmp}/context-audio-pairs.XXXXXX")
+  if ! "$python_bin" - "$manifest_path" "$audio_pairs" > "$audio_plan" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1]).resolve()
+limit = int(sys.argv[2])
+
+
+def resolve_path(value: str) -> Path:
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = manifest_path.parent / path
+    return path.resolve()
+
+
+def safe_item_dir(raw_id: object, index: int) -> str:
+    text = str(raw_id or f"item-{index:03d}")
+    text = re.sub(r"[^A-Za-z0-9._-]+", "_", text).strip("._-")
+    if not text:
+        text = f"item-{index:03d}"
+    return f"{index:03d}-{text[:80]}"
+
+
+emitted = 0
+with manifest_path.open("r", encoding="utf-8") as handle:
+    for line in handle:
+        if emitted >= limit:
+            break
+        line = line.strip()
+        if not line:
+            continue
+        row = json.loads(line)
+        source_value = row.get("source_path")
+        reconstruction_value = row.get("reconstruction_path")
+        if not source_value or not reconstruction_value:
+            continue
+        emitted += 1
+        item_dir = safe_item_dir(row.get("id"), emitted)
+        source_path = resolve_path(str(source_value))
+        reconstruction_path = resolve_path(str(reconstruction_value))
+        source_suffix = source_path.suffix or ".audio"
+        reconstruction_suffix = reconstruction_path.suffix or ".wav"
+        print(
+            "\t".join(
+                [
+                    str(source_path),
+                    f"audio_pairs/{item_dir}/source{source_suffix}",
+                    str(reconstruction_path),
+                    f"audio_pairs/{item_dir}/reconstruction{reconstruction_suffix}",
+                ]
+            )
+        )
+PY
+  then
+    rm -f "$audio_plan"
+    printf 'Error: failed to parse audio pairs from %s\n' "$manifest_path" >&2
+    exit 1
+  fi
+
+  while IFS=$'\t' read -r source_path source_dest reconstruction_path reconstruction_dest; do
+    copy_if_exists "$source_path" "$source_dest"
+    copy_if_exists "$reconstruction_path" "$reconstruction_dest"
+  done < "$audio_plan"
+  rm -f "$audio_plan"
+}
+
 init_manifest
 
 copy_if_exists "$export_dir/manifest.jsonl" "$export_name/manifest.jsonl"
@@ -186,6 +291,7 @@ copy_if_exists "$results_dir/summary.json" "$results_name/summary.json"
 
 copy_prior_files "$prior_root/local-tcn" "$prior_name/local-tcn"
 copy_prior_files "$prior_root/long-transformer" "$prior_name/long-transformer"
+copy_audio_pairs
 
 if [ "$dry_run" -eq 1 ]; then
   printf '[dry-run] bundle dir: %s\n' "$bundle_dir"
